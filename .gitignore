@@ -1,5 +1,5 @@
 .DS_Store
 /target
-java
-minecraft
+/java
+/minecraft
 /mc.toml
