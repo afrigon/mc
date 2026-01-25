@@ -1,0 +1,87 @@
+name: deploy
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-latest
+            file: mc-linux.tar.gz
+          - os: macos-latest
+            file: mc-macos.tar.gz
+          - os: windows-latest
+            file: mc-windows.zip
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release --locked
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          cp target/release/mc dist/mc
+          tar -czf dist/${{ matrix.file }} -C dist mc
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target\release\mc.exe dist\mc.exe
+          Compress-Archive -Path dist\mc.exe -DestinationPath dist\${{ matrix.file }} -Force
+
+      - name: SHA256 (linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd dist
+          sha256sum "${{ matrix.file }}" > "${{ matrix.file }}.sha256"
+
+      - name: SHA256 (macos)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          shasum -a 256 "${{ matrix.file }}" > "${{ matrix.file }}.sha256"
+
+      - name: SHA256 (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = "dist\${{ matrix.file }}"
+          $hash = (Get-FileHash -Algorithm SHA256 $p).Hash.ToLower()
+          "$hash  ${{ matrix.file }}" | Out-File -Encoding ascii "dist\${{ matrix.file }}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}-bundle
+          path: |
+            dist/${{ matrix.file }}
+            dist/${{ matrix.file }}.sha256
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish GitHub Release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
