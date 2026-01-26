@@ -1,43 +1,81 @@
+use std::path::Path;
+
+use toml_edit::Decor;
+
+use crate::utils;
 use crate::{
     cli::{commands::init::InitCommand, context::CliContext},
     utils::errors::McResult,
 };
 
+fn get_name<'a>(path: &'a Path, command: &'a InitCommand) -> McResult<&'a str> {
+    if let Some(ref name) = command.name {
+        return Ok(name);
+    }
+
+    let file_name = path.file_name().ok_or_else(|| {
+        anyhow::format_err!(
+            "cannot auto-detect server name from path {:?} ; use --name to override",
+            path.as_os_str()
+        )
+    })?;
+
+    file_name.to_str().ok_or_else(|| {
+        anyhow::format_err!(
+            "cannot create server with a non-unicode name: {:?}",
+            file_name
+        )
+    })
+}
+
 pub async fn init(context: &mut CliContext, command: &InitCommand) -> McResult<()> {
+    let path = context.cwd.join(&command.path);
+    let name = get_name(&path, command)?;
+
     context.shell().status("Creating", "Minecraft server")?;
 
-    if command.path.join("mc.toml").exists() {
+    let toml_path = path.join("mc.toml");
+
+    if toml_path.exists() {
         anyhow::bail!("`mc init` cannot be run on existing mc server")
     }
 
-    // if !tokio::fs::try_exists(&path).await? {
-    // } else {
-    //     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-    //     utils::restricted_names::validate_server_name(name)?;
+    utils::restricted_names::validate_server_name(name)?;
 
-    //     tokio::fs::create_dir_all(&path).await?;
-    // }
+    tokio::fs::create_dir_all(&path).await?;
 
-    // let path = tokio::fs::canonicalize(path).await;
+    if !command.eula {
+        context
+            .shell()
+            .warn("the server will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`")?;
+    }
 
-    // let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-    // utils::restricted_names::validate_server_name(name)?;
+    let mut manifest = toml_edit::DocumentMut::new();
+    manifest["name"] = toml_edit::value(name);
 
-    // tokio::fs::create_dir_all(&path).await?;
+    let server_table = manifest["server"]
+        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()))
+        .as_table_mut()
+        .ok_or_else(|| utils::errors::internal("failed to unwrap the server toml table"))?;
 
-    // let toml_path = path.join("mc.toml");
+    server_table["eula"] = toml_edit::value(command.eula);
+    server_table
+        .key_mut("eula")
+        .ok_or_else(|| utils::errors::internal("failed to unwrap the eula toml key"))?
+        .leaf_decor_mut()
+        .set_prefix("\n# Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).\n# This agreement is between you and Mojang/Microsoft.\n");
 
-    // if tokio::fs::try_exists(&toml_path).await? {
-    //     anyhow::bail!("`mc init` cannot be run on existing mc servers")
-    // }
+    manifest["backups"] = toml_edit::Item::Table(toml_edit::Table::new());
+    manifest["backups"]["enabled"] = toml_edit::value(true);
 
-    // // initialize default toml
-    // // save toml file in directory
+    manifest["mods"] = toml_edit::Item::Table(toml_edit::Table::new());
 
-    // tokio::try_join!(
-    //     tokio::fs::create_dir_all(path.join("minecraft")),
-    //     tokio::fs::create_dir_all(path.join("java"))
-    // )?;
+    tokio::fs::write(toml_path, manifest.to_string()).await?;
+
+    tokio::try_join!(
+        tokio::fs::create_dir_all(path.join("minecraft")),
+        tokio::fs::create_dir_all(path.join("java"))
+    )?;
 
     Ok(())
 }

@@ -17,8 +17,8 @@ enum ErrorKind {
         ch: char,
         what: &'static str,
         name: String,
-        reason: &'static str
-    }
+        reason: &'static str,
+    },
 }
 
 pub fn validate_server_name(name: &str) -> Result<()> {
@@ -39,7 +39,7 @@ fn validate_name(name: &str, what: &'static str) -> Result<()> {
                 ch,
                 what,
                 name: name.into(),
-                reason: "the name cannot start with a digit"
+                reason: "the name cannot start with a digit",
             }
             .into());
         }
@@ -50,7 +50,7 @@ fn validate_name(name: &str, what: &'static str) -> Result<()> {
                 what,
                 name: name.into(),
                 reason: "the first character must be a Unicode XID start character \
-                 (most letters or `_`)"
+                 (most letters or `_`)",
             }
             .into());
         }
@@ -63,7 +63,7 @@ fn validate_name(name: &str, what: &'static str) -> Result<()> {
                 what,
                 name: name.into(),
                 reason: "characters must be Unicode XID characters \
-                 (numbers, `-`, `_`, or most letters)"
+                 (numbers, `-`, `_`, or most letters)",
             }
             .into());
         }

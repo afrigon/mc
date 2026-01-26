@@ -21,7 +21,7 @@ use crate::{
         context::CliContext,
     },
     utils::{
-        errors::{CliError, CliResult},
+        errors::{CliError, CliResult, InternalError},
         shell::Shell,
         verbosity::Verbosity,
     },
@@ -57,6 +57,8 @@ async fn main() {
 
     let color_choice = cli.globals.color;
     context.shell().set_color_choice(color_choice);
+
+    // TODO: add lockfile checks here to make sure we're not trying to edit / backup the server while its running... or various other edge cases.
 
     match run(&cli, &mut context).await {
         Err(e) => exit_with_error(e, &mut context.shell()),
@@ -112,6 +114,21 @@ fn exit_with_error(error: CliError, shell: &mut Shell) -> ! {
                 drop(writeln!(shell.err(), "\nCaused by:"));
                 drop(writeln!(shell.err(), "{}", lines));
             }
+        }
+
+        if error
+            .chain()
+            .any(|e| e.downcast_ref::<InternalError>().is_some())
+        {
+            drop(shell.note("this is an unexpected mc internal error"));
+            drop(
+                shell.note("you can submit bug reports at: https://github.com/afrigon/mc/issues/"),
+            );
+            drop(shell.note(format!(
+                "{} {}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION")
+            )));
         }
     }
 

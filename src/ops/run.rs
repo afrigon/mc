@@ -12,6 +12,8 @@ use crate::{
 pub async fn run(context: &mut CliContext, command: &RunCommand) -> McResult<()> {
     let manifest_raw = tokio::fs::read_to_string(&command.manifest_path).await?;
 
+    // TODO: check for eula settings before starting the server that is going to fail
+
     match toml::from_str::<Manifest>(&manifest_raw) {
         Ok(manifest) => {
             // let java_version = manifest.java.version;

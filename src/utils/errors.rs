@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io;
 
 pub type McResult<T> = anyhow::Result<T>;
@@ -13,13 +14,6 @@ impl CliError {
     pub fn new(error: anyhow::Error, code: i32) -> CliError {
         CliError {
             error: Some(error),
-            exit_code: code,
-        }
-    }
-
-    pub fn code(code: i32) -> CliError {
-        CliError {
-            error: None,
             exit_code: code,
         }
     }
@@ -42,4 +36,32 @@ impl From<io::Error> for CliError {
     fn from(value: io::Error) -> Self {
         CliError::new(value.into(), 1)
     }
+}
+
+pub struct InternalError {
+    inner: anyhow::Error,
+}
+
+impl InternalError {
+    pub fn new(error: anyhow::Error) -> InternalError {
+        InternalError { inner: error }
+    }
+}
+
+impl std::error::Error for InternalError {}
+
+impl fmt::Display for InternalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+impl fmt::Debug for InternalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
+    }
+}
+
+pub fn internal<S: fmt::Display>(error: S) -> anyhow::Error {
+    InternalError::new(anyhow::format_err!("{}", error)).into()
 }

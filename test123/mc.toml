@@ -1,0 +1,12 @@
+name = "test123"
+
+[server]
+
+# Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).
+# This agreement is between you and Mojang.
+eula = true
+
+[backups]
+enabled = true
+
+[mods]

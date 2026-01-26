@@ -11,6 +11,14 @@ use crate::{
 pub struct InitCommand {
     #[arg(default_value = ".")]
     pub path: PathBuf,
+
+    /// Set the resulting server name, defaults to the directory name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Automatically agree to the Minecraft EULA (https://aka.ms/MinecraftEULA)
+    #[arg(long, default_value_t = false)]
+    pub eula: bool,
 }
 
 impl CommandHandler for InitCommand {

@@ -74,13 +74,6 @@ jobs:
           cp target/${{ matrix.target }}/release/mc dist/mc
           tar -czf dist/${{ matrix.filename }} -C dist mc
 
-          # sha256
-          if command -v sha256sum >/dev/null 2>&1; then
-            (cd dist && sha256sum "${{ matrix.filename }}" > "${{ matrix.filename }}.sha256")
-          else
-            (cd dist && shasum -a 256 "${{ matrix.filename }}" > "${{ matrix.filename }}.sha256")
-          fi
-
       - name: Package (windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -89,15 +82,11 @@ jobs:
           Copy-Item target\${{ matrix.target }}\release\mc.exe dist\mc.exe
           Compress-Archive -Path dist\mc.exe -DestinationPath dist\${{ matrix.filename }} -Force
 
-          $hash = (Get-FileHash -Algorithm SHA256 "dist\${{ matrix.filename }}").Hash.ToLower()
-          "$hash  ${{ matrix.filename }}" | Out-File -Encoding ascii "dist\${{ matrix.filename }}.sha256"
-
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.filename }}-bundle
+          name: ${{ matrix.filename }}
           path: |
             dist/${{ matrix.filename }}
-            dist/${{ matrix.filename }}.sha256
 
   release:
     runs-on: ubuntu-latest

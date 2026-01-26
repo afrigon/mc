@@ -16,6 +16,7 @@ pub struct RunCommand {
         value_name = "PATH"
     )]
     pub manifest_path: PathBuf,
+    // TODO: add ip, port and rcon port settings here
 }
 
 impl CommandHandler for RunCommand {
