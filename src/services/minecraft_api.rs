@@ -58,51 +58,43 @@ pub struct MinecraftApiArtifactMetadata {
     pub sha1: String
 }
 
-pub struct MinecraftApiService {}
+// TODO: review the error and types here and in other services
+pub async fn get_manifest(
+    client: &reqwest::Client
+) -> Result<MinecraftApiVersionManifest, reqwest::Error> {
+    client
+        .get(LIST_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await
+}
 
-impl MinecraftApiService {
-    pub async fn get_manifest(
-        client: &reqwest::Client
-    ) -> Result<MinecraftApiVersionManifest, reqwest::Error> {
-        client
-            .get(LIST_URL)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await
-    }
+pub async fn get_metadata(
+    client: &reqwest::Client,
+    url: &Url
+) -> Result<MinecraftApiVersionMetadata, reqwest::Error> {
+    client
+        .get(url.clone())
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await
+}
 
-    pub async fn get_metadata(
-        client: &reqwest::Client,
-        url: &Url
-    ) -> Result<MinecraftApiVersionMetadata, reqwest::Error> {
-        client
-            .get(url.clone())
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await
-    }
-
-    // TODO: move this outside of this service
-    pub async fn download_version(client: &reqwest::Client, url: &Url) -> anyhow::Result<()> {
-        // let cache = &Context::current().directories.cache;
-
-        // let filename = url
-        //     .path_segments()
-        //     .and_then(|s| s.last())
-        //     .filter(|s| !s.is_empty())
-        //     .expect("url must end with a file name");
-
-        // let output = &Context::current().directories.data
-        //     .join(filename);
-
-        // network::stream_file(client, url, output, cache).await?;
-
-        // TODO: add checksum validation
-
-        Ok(())
-    }
+// TODO: move this outside of this service
+pub async fn download_version(client: &reqwest::Client, url: &Url) -> anyhow::Result<()> {
+    // let cache = &Context::current().directories.cache;
+    // let filename = url
+    //     .path_segments()
+    //     .and_then(|s| s.last())
+    //     .filter(|s| !s.is_empty())
+    //     .expect("url must end with a file name");
+    // let output = &Context::current().directories.data
+    //     .join(filename);
+    // network::stream_file(client, url, output, cache).await?;
+    // TODO: add checksum validation
+    Ok(())
 }

@@ -1,7 +1,9 @@
 use url::Url;
 
-use crate::crypto::checksum::{ChecksumRef, RemoteChecksum};
-use crate::env::{Architecture, Platform};
+use crate::crypto::checksum::ChecksumRef;
+use crate::crypto::checksum::RemoteChecksum;
+use crate::env::Architecture;
+use crate::env::Platform;
 use crate::java::JavaVersion;
 use crate::network::artifact::ArtifactSource;
 use crate::services::java_provider::JavaProvider;

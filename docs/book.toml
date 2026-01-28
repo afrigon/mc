@@ -1,0 +1,8 @@
+[book]
+title = "mc Documentation"
+authors = ["Alexandre Frigon"]
+language = "en"
+
+[output.html]
+git-repository-url = "https://github.com/afrigon/mc/tree/main/docs/src"
+edit-url-template = "https://github.com/afrigon/mc/edit/main/docs/{path}"

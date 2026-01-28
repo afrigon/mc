@@ -1,6 +1,7 @@
-use serde::Deserialize;
 use std::fmt;
 use std::str::FromStr;
+
+use serde::Deserialize;
 
 #[derive(Clone, Copy, PartialEq, Eq, Deserialize)]
 pub enum JavaVersion {
@@ -38,7 +39,7 @@ impl fmt::Display for JavaVersion {
 }
 
 impl FromStr for JavaVersion {
-    type Err = &'static str;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -47,7 +48,7 @@ impl FromStr for JavaVersion {
             "17" => Ok(JavaVersion::Java17),
             "11" => Ok(JavaVersion::Java11),
             "8" => Ok(JavaVersion::Java8),
-            _ => Err("unknown java version")
+            _ => anyhow::bail!("unknown java version")
         }
     }
 }

@@ -1,3 +1,1 @@
-mod version;
-
-pub use version::MinecraftVersion;
+pub mod loader;

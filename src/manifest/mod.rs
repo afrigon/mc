@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::java::{JavaDistribution, JavaVersion};
+use crate::utils::product_descriptor::RawProductDescriptor;
 
 #[derive(Deserialize)]
 pub struct Manifest {
@@ -15,7 +15,7 @@ pub struct Manifest {
 
 #[derive(Deserialize)]
 pub struct ManifestJava {
-    pub version: Option<JavaDistribution>
+    pub version: Option<RawProductDescriptor>
 }
 
 #[derive(Deserialize)]

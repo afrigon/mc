@@ -1,4 +1,6 @@
-use anstyle::{AnsiColor, Effects, Style};
+use anstyle::AnsiColor;
+use anstyle::Effects;
+use anstyle::Style;
 use clap::builder::Styles;
 
 pub const HEADER: Style = AnsiColor::BrightGreen.on_default().effects(Effects::BOLD);

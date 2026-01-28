@@ -1,6 +1,7 @@
 pub mod artifact;
 
 use std::path::Path;
+
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use url::Url;
@@ -35,7 +36,6 @@ pub async fn stream_file(
     }
 
     f.flush().await?;
-
     fs::rename(&cache, output).await?;
 
     Ok(())

@@ -1,57 +1,62 @@
-use crate::{
-    cli::{
-        commands::minecraft::{MinecraftInstallCommand, MinecraftListCommand},
-        context::CliContext,
-    },
-    minecraft::MinecraftVersion,
-    services::minecraft_api::{
-        MinecraftApiService, MinecraftApiVersionManifestEntry, MinecraftApiVersionType,
-    },
-    utils::errors::McResult,
-};
+use std::path::PathBuf;
 
-pub async fn install(context: &mut CliContext, command: &MinecraftInstallCommand) -> McResult<()> {
+use crate::context::McContext;
+use crate::minecraft::loader::LoaderKind;
+use crate::services;
+use crate::services::minecraft_api::MinecraftApiVersionManifestEntry;
+use crate::services::minecraft_api::MinecraftApiVersionType;
+use crate::utils::errors::McResult;
+use crate::utils::product_descriptor::ProductDescriptor;
+
+pub struct MinecraftInstallOptions {
+    pub version: String,
+    pub loader: Option<ProductDescriptor<LoaderKind>>,
+    pub minecraft_directory: PathBuf
+}
+
+pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions) -> McResult<()> {
     // TODO: check if already installed
     // TODO: add confirm, override, etc dialogs
     // TODO: add progress bar
+    // let manifest = services::minecraft_api::get_manifest(&context.http_client).await?;
 
-    let manifest = MinecraftApiService::get_manifest(&context.http_client).await?;
+    // if let Some(version) = manifest.versions.iter().find(|v| v.id == version_id) {
+    //     let metadata =
+    //         services::minecraft_api::get_metadata(&context.http_client, &version.url).await?;
 
-    let version_id = match &command.version {
-        MinecraftVersion::Latest => manifest.latest.release,
-        MinecraftVersion::LatestSnapshot => manifest.latest.snapshot,
-        MinecraftVersion::Version(s) => s.clone(),
-    };
+    //     let url = &metadata.downloads.server.url;
 
-    if let Some(version) = manifest.versions.iter().find(|v| v.id == version_id) {
-        let metadata =
-            MinecraftApiService::get_metadata(&context.http_client, &version.url).await?;
-        let url = &metadata.downloads.server.url;
-
-        MinecraftApiService::download_version(&context.http_client, &url).await?;
-    } else {
-        // TODO: fix this
-        // return Err(format!("Could not find minecraft version {}", version_id))
-    };
+    //     services::minecraft_api::download_version(&context.http_client, &url).await?;
+    // } else {
+    //     // TODO: fix this
+    //     // return Err(format!("Could not find minecraft version {}", version_id))
+    // };
 
     Ok(())
 }
 
-pub async fn list(context: &mut CliContext, command: &MinecraftListCommand) -> McResult<()> {
-    let manifest = MinecraftApiService::get_manifest(&context.http_client).await?;
+pub struct MinecraftListOptions {
+    pub all: bool,
+    pub snapshots: bool,
+    pub betas: bool,
+    pub alphas: bool
+}
+
+pub async fn list(context: &mut McContext, options: &MinecraftListOptions) -> McResult<()> {
+    let manifest = services::minecraft_api::get_manifest(&context.http_client).await?;
 
     let versions: Vec<&MinecraftApiVersionManifestEntry> = manifest
         .versions
         .iter()
         .filter(|v| match v.version_type {
             MinecraftApiVersionType::Release => true,
-            MinecraftApiVersionType::Snapshot => command.snapshots,
-            MinecraftApiVersionType::Beta => command.betas,
-            MinecraftApiVersionType::Alpha => command.alphas,
+            MinecraftApiVersionType::Snapshot => options.snapshots,
+            MinecraftApiVersionType::Beta => options.betas,
+            MinecraftApiVersionType::Alpha => options.alphas
         })
         .collect();
 
-    let count = if command.all {
+    let count = if options.all {
         versions.len()
     } else {
         10.min(versions.len())
@@ -59,23 +64,58 @@ pub async fn list(context: &mut CliContext, command: &MinecraftListCommand) -> M
 
     let rest = versions.len() - count;
 
+    let mut shell = context.shell();
+    let stdout = shell.out();
+
     for i in 0..count {
         let version = versions[i];
 
-        print!("{}", version.id);
+        write!(stdout, "{}", version.id);
 
         if version.id == manifest.latest.release {
-            print!(" (latest)")
+            write!(stdout, " (latest)");
         } else if version.id == manifest.latest.snapshot {
-            print!(" (latest-snapshot)")
+            write!(stdout, " (latest-snapshot)");
         }
 
-        print!("\n");
+        write!(stdout, "\n");
     }
 
     if rest != 0 {
-        println!("and {} more. use --all to see all versions", rest);
+        writeln!(stdout, "and {} more. use --all to see all versions", rest);
     };
+
+    Ok(())
+}
+
+pub struct MinecraftListLoadersOptions {
+    pub loader: LoaderKind,
+    pub minecraft_version: String,
+    pub limit: usize
+}
+
+pub async fn list_loaders(
+    context: &mut McContext,
+    options: &MinecraftListLoadersOptions
+) -> McResult<()> {
+    let versions = match options.loader {
+        LoaderKind::Fabric => services::fabric_api::get_versions_for_game(
+            &context.http_client,
+            &options.minecraft_version
+        )
+    }
+    .await?;
+
+    let mut shell = context.shell();
+    let stdout = shell.out();
+
+    for i in 0..options.limit {
+        if i == 0 {
+            writeln!(stdout, "{} (latest)", versions[i].version)?
+        } else {
+            writeln!(stdout, "{}", versions[i].version)?
+        }
+    }
 
     Ok(())
 }

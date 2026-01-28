@@ -1,4 +1,5 @@
-use crate::env::{Architecture, Platform};
+use crate::env::Architecture;
+use crate::env::Platform;
 use crate::java::JavaVersion;
 use crate::network::artifact::ArtifactSource;
 

@@ -1,15 +1,18 @@
 use std::path::Path;
+use std::path::PathBuf;
 
-use toml_edit::Decor;
-
+use crate::context::McContext;
 use crate::utils;
-use crate::{
-    cli::{commands::init::InitCommand, context::CliContext},
-    utils::errors::McResult,
-};
+use crate::utils::errors::McResult;
 
-fn get_name<'a>(path: &'a Path, command: &'a InitCommand) -> McResult<&'a str> {
-    if let Some(ref name) = command.name {
+pub struct InitOptions {
+    pub path: PathBuf,
+    pub name: Option<String>,
+    pub eula: bool
+}
+
+fn get_name<'a>(path: &'a Path, options: &'a InitOptions) -> McResult<&'a str> {
+    if let Some(ref name) = options.name {
         return Ok(name);
     }
 
@@ -28,9 +31,9 @@ fn get_name<'a>(path: &'a Path, command: &'a InitCommand) -> McResult<&'a str> {
     })
 }
 
-pub async fn init(context: &mut CliContext, command: &InitCommand) -> McResult<()> {
-    let path = context.cwd.join(&command.path);
-    let name = get_name(&path, command)?;
+pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()> {
+    let path = &options.path;
+    let name = get_name(path, options)?;
 
     context.shell().status("Creating", "Minecraft server")?;
 
@@ -44,13 +47,14 @@ pub async fn init(context: &mut CliContext, command: &InitCommand) -> McResult<(
 
     tokio::fs::create_dir_all(&path).await?;
 
-    if !command.eula {
+    if !options.eula {
         context
             .shell()
             .warn("the server will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`")?;
     }
 
     let mut manifest = toml_edit::DocumentMut::new();
+
     manifest["name"] = toml_edit::value(name);
 
     let server_table = manifest["server"]
@@ -58,7 +62,7 @@ pub async fn init(context: &mut CliContext, command: &InitCommand) -> McResult<(
         .as_table_mut()
         .ok_or_else(|| utils::errors::internal("failed to unwrap the server toml table"))?;
 
-    server_table["eula"] = toml_edit::value(command.eula);
+    server_table["eula"] = toml_edit::value(options.eula);
     server_table
         .key_mut("eula")
         .ok_or_else(|| utils::errors::internal("failed to unwrap the eula toml key"))?
@@ -76,6 +80,8 @@ pub async fn init(context: &mut CliContext, command: &InitCommand) -> McResult<(
         tokio::fs::create_dir_all(path.join("minecraft")),
         tokio::fs::create_dir_all(path.join("java"))
     )?;
+
+    context.shell().note("see more `mc.toml` keys and their definitions at https://doc.mc.frigon.app/reference/manifest.html")?;
 
     Ok(())
 }

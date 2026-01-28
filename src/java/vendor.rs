@@ -1,6 +1,7 @@
-use serde::Deserialize;
 use std::fmt;
 use std::str::FromStr;
+
+use serde::Deserialize;
 
 use crate::java::JavaVersion;
 
@@ -28,13 +29,13 @@ impl fmt::Display for JavaVendor {
 }
 
 impl FromStr for JavaVendor {
-    type Err = &'static str;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "corretto" => Ok(JavaVendor::correto),
             "graal" | "graalvm" | "graal-vm" => Ok(JavaVendor::graal),
-            _ => Err("unknown java vendor")
+            _ => anyhow::bail!("unknown java vendor")
         }
     }
 }

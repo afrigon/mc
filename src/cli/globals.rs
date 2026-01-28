@@ -1,4 +1,6 @@
-use clap::{Args, ColorChoice, ArgAction};
+use clap::ArgAction;
+use clap::Args;
+use clap::ColorChoice;
 
 #[derive(Args)]
 pub struct GlobalOptions {
@@ -16,7 +18,7 @@ pub struct GlobalOptions {
         value_name = "WHEN", 
         global = true, 
         default_value_t = ColorChoice::Auto, 
-        hide_default_value = true, 
+        hide_default_value = true,
         hide_possible_values = true,
         ignore_case = true
     )]

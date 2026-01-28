@@ -2,19 +2,20 @@ use std::fmt;
 use std::io;
 
 pub type McResult<T> = anyhow::Result<T>;
+
 pub type CliResult = Result<(), CliError>;
 
 #[derive(Debug)]
 pub struct CliError {
     pub error: Option<anyhow::Error>,
-    pub exit_code: i32,
+    pub exit_code: i32
 }
 
 impl CliError {
     pub fn new(error: anyhow::Error, code: i32) -> CliError {
         CliError {
             error: Some(error),
-            exit_code: code,
+            exit_code: code
         }
     }
 }
@@ -28,6 +29,7 @@ impl From<anyhow::Error> for CliError {
 impl From<clap::Error> for CliError {
     fn from(value: clap::Error) -> Self {
         let code = if value.use_stderr() { 1 } else { 0 };
+
         CliError::new(value.into(), code)
     }
 }
@@ -39,7 +41,7 @@ impl From<io::Error> for CliError {
 }
 
 pub struct InternalError {
-    inner: anyhow::Error,
+    inner: anyhow::Error
 }
 
 impl InternalError {

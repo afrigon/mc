@@ -1,11 +1,16 @@
-use annotate_snippets::renderer::DecorStyle;
-use annotate_snippets::{Renderer, Report};
-use anstream::{AutoStream, ColorChoice};
-use anstyle::Style;
 use std::fmt;
 use std::io::Write;
 
-use crate::cli::styles::{ERROR, HEADER, WARN};
+use annotate_snippets::Renderer;
+use annotate_snippets::Report;
+use annotate_snippets::renderer::DecorStyle;
+use anstream::AutoStream;
+use anstream::ColorChoice;
+use anstyle::Style;
+
+use crate::cli::styles::ERROR;
+use crate::cli::styles::HEADER;
+use crate::cli::styles::WARN;
 use crate::utils::errors::McResult;
 use crate::utils::verbosity::Verbosity;
 
@@ -13,7 +18,7 @@ pub struct Shell {
     stdout: AutoStream<std::io::Stdout>,
     stderr: AutoStream<std::io::Stderr>,
     verbosity: Verbosity,
-    color_choice: ColorChoice,
+    color_choice: ColorChoice
 }
 
 impl Shell {
@@ -24,7 +29,7 @@ impl Shell {
             stdout: AutoStream::new(std::io::stdout(), color_choice),
             stderr: AutoStream::new(std::io::stderr(), color_choice),
             verbosity: Verbosity::Regular,
-            color_choice,
+            color_choice
         }
     }
 
@@ -48,7 +53,7 @@ impl Shell {
         self.color_choice = match color_choice {
             clap::ColorChoice::Auto => ColorChoice::Auto,
             clap::ColorChoice::Always => ColorChoice::Always,
-            clap::ColorChoice::Never => ColorChoice::Never,
+            clap::ColorChoice::Never => ColorChoice::Never
         };
 
         self.stdout = AutoStream::new(std::io::stdout(), self.color_choice);
@@ -60,7 +65,7 @@ impl Shell {
         status: &dyn fmt::Display,
         message: Option<&dyn fmt::Display>,
         style: &Style,
-        justified: bool,
+        justified: bool
     ) -> anyhow::Result<()> {
         let mut buffer = Vec::new();
 
@@ -72,7 +77,7 @@ impl Shell {
 
         match message {
             Some(message) => writeln!(buffer, " {message}")?,
-            None => write!(buffer, " ")?,
+            None => write!(buffer, " ")?
         }
 
         self.stderr.write_all(&buffer)?;
@@ -85,42 +90,42 @@ impl Shell {
         status: &dyn fmt::Display,
         message: Option<&dyn fmt::Display>,
         style: &Style,
-        justified: bool,
+        justified: bool
     ) -> anyhow::Result<()> {
         match self.verbosity {
             Verbosity::Quiet => Ok(()),
-            _ => self.output_stderr(status, message, style, justified),
+            _ => self.output_stderr(status, message, style, justified)
         }
     }
 
     pub fn status<S, M>(&mut self, status: S, message: M) -> anyhow::Result<()>
     where
         S: fmt::Display,
-        M: fmt::Display,
+        M: fmt::Display
     {
         self.print(&status, Some(&message), &HEADER, true)
     }
 
     pub fn error<M>(&mut self, message: M) -> anyhow::Result<()>
     where
-        M: fmt::Display,
+        M: fmt::Display
     {
         self.output_stderr(&"error", Some(&message), &ERROR, false)
     }
 
     pub fn warn<M>(&mut self, message: M) -> anyhow::Result<()>
     where
-        M: fmt::Display,
+        M: fmt::Display
     {
         self.output_stderr(&"warning", Some(&message), &WARN, false)
     }
 
     pub fn note<M>(&mut self, message: M) -> anyhow::Result<()>
     where
-        M: fmt::Display,
+        M: fmt::Display
     {
         let report = &[annotate_snippets::Group::with_title(
-            annotate_snippets::Level::NOTE.secondary_title(message.to_string()),
+            annotate_snippets::Level::NOTE.secondary_title(message.to_string())
         )];
 
         self.print_report(report, false)
@@ -148,6 +153,7 @@ impl Shell {
 }
 
 #[cfg(unix)]
+
 mod platform_shell {
     use std::mem;
 
@@ -171,24 +177,29 @@ mod platform_shell {
 }
 
 #[cfg(windows)]
-mod platform_shell {
-    use std::{mem, ptr};
 
-    use windows_sys::{
-        Win32::{
-            Foundation::{CloseHandle, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE},
-            Storage::FileSystem::{CreateFileA, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING},
-            System::Console::{
-                CONSOLE_SCREEN_BUFFER_INFO, GetConsoleScreenBufferInfo, GetStdHandle,
-                STD_ERROR_HANDLE,
-            },
-        },
-        core::PCSTR,
-    };
+mod platform_shell {
+    use std::mem;
+    use std::ptr;
+
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::Foundation::GENERIC_READ;
+    use windows_sys::Win32::Foundation::GENERIC_WRITE;
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::Storage::FileSystem::CreateFileA;
+    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_WRITE;
+    use windows_sys::Win32::Storage::FileSystem::OPEN_EXISTING;
+    use windows_sys::Win32::System::Console::CONSOLE_SCREEN_BUFFER_INFO;
+    use windows_sys::Win32::System::Console::GetConsoleScreenBufferInfo;
+    use windows_sys::Win32::System::Console::GetStdHandle;
+    use windows_sys::Win32::System::Console::STD_ERROR_HANDLE;
+    use windows_sys::core::PCSTR;
 
     pub fn stderr_width() -> Option<usize> {
         unsafe {
             let stdout = GetStdHandle(STD_ERROR_HANDLE);
+
             let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
 
             if GetConsoleScreenBufferInfo(stdout, &mut csbi) != 0 {
@@ -205,7 +216,7 @@ mod platform_shell {
                 ptr::null_mut(),
                 OPEN_EXISTING,
                 0,
-                std::ptr::null_mut(),
+                std::ptr::null_mut()
             );
 
             if h == INVALID_HANDLE_VALUE {
@@ -214,6 +225,7 @@ mod platform_shell {
 
             let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
             let rc = GetConsoleScreenBufferInfo(h, &mut csbi);
+
             CloseHandle(h);
 
             None

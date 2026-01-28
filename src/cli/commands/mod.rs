@@ -5,9 +5,10 @@ pub mod run;
 
 use clap::Subcommand;
 
-use crate::cli::commands::{
-    init::InitCommand, java::JavaCommand, minecraft::MinecraftCommand, run::RunCommand,
-};
+use crate::cli::commands::init::InitCommand;
+use crate::cli::commands::java::JavaCommand;
+use crate::cli::commands::minecraft::MinecraftCommand;
+use crate::cli::commands::run::RunCommand;
 
 #[derive(Subcommand)]
 pub enum CliCommand {
@@ -19,5 +20,5 @@ pub enum CliCommand {
     Init(InitCommand),
 
     /// Run the Minecraft server
-    Run(RunCommand),
+    Run(RunCommand)
 }
