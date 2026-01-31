@@ -6,6 +6,10 @@ use crate::env::Platform;
 use crate::java::JavaDescriptor;
 use crate::java::JavaVendor;
 use crate::java::JavaVersion;
+use crate::network;
+use crate::services::corretto_api;
+use crate::services::graal_api;
+use crate::services::java_provider::JavaProvider;
 use crate::utils::CaseIterable;
 use crate::utils::errors::McResult;
 
@@ -17,17 +21,31 @@ pub struct JavaInstallOptions {
 }
 
 pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> McResult<()> {
-    // TODO: check if already installed
-    // TODO: add confirm, override, etc dialogs
+    let name = options.version.to_string();
+    let path = options.java_directory.join(&name);
+
+    if path.exists() {
+        anyhow::bail!("{} is already installed", name);
+    }
+
     // TODO: add progress bar
-    // JavaService::download_version(
-    //     &context.http_client,
-    //     version,
-    //     platform.unwrap_or(Platform::current()),
-    //     architecture.unwrap_or(Architecture::current())
-    // )
-    // .await?;
-    Ok(())
+
+    _ = context.shell().status("Installing", name);
+
+    let source = match options.version.product {
+        JavaVendor::correto => corretto_api::CorrettoApi::jdk_source(
+            options.version.version,
+            options.platform,
+            options.architecture
+        ),
+        JavaVendor::graal => graal_api::GraalApi::jdk_source(
+            options.version.version,
+            options.platform,
+            options.architecture
+        )
+    };
+
+    network::stream_and_deflate(&context.http_client, source, &path).await
 }
 
 pub struct JavaListOptions {}
@@ -37,13 +55,13 @@ pub async fn list(context: &mut McContext, options: &JavaListOptions) -> McResul
         let mut shell = context.shell();
         let stdout = shell.out();
 
-        write!(stdout, "{}", *descriptor);
+        _ = write!(stdout, "{}", *descriptor);
 
         if descriptor.product == JavaVendor::graal && descriptor.version == JavaVersion::Java25 {
-            write!(stdout, " (recommended)");
+            _ = write!(stdout, " (recommended)");
         }
 
-        write!(stdout, "\n");
+        _ = write!(stdout, "\n");
     }
 
     Ok(())

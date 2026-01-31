@@ -8,14 +8,22 @@ annotate-snippets = "0.12.10"
 anstream = "0.6.21"
 anstyle = "1.0.13"
 anyhow = "1.0.100"
+chrono = "0.4.43"
+chrono-tz = "0.10.4"
 clap = { version = "4.5.54", features = ["derive"] }
+digest = "0.10.7"
 directories = "6.0.0"
+flate2 = "1.1.8"
 hex = { version = "0.4.3", features = ["serde"] }
+iana-time-zone = "0.1.65"
 libc = "0.2.180"
+md-5 = "0.10.6"
+rand = "0.9.2"
 reqwest = { version = "0.13.1", features = ["json", "stream"] }
 serde = { version = "1.0.228", features = ["derive"] }
 sha1 = "0.10.6"
 sha2 = "0.10.9"
+tar = "0.4.44"
 tempfile = "3.24.0"
 thiserror = "2.0.18"
 tokio = { version = "1.49.0", features = ["full"] } # change this to only required features
@@ -25,3 +33,4 @@ tracing = "0.1.44"
 unicode-ident = "1.0.22"
 url = { version = "2.5.8", features = ["serde"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_Storage_FileSystem"] }
+zip = "7.2.0"

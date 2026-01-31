@@ -8,7 +8,7 @@ use crate::java::JavaVersion;
 use crate::network::artifact::ArtifactSource;
 use crate::services::java_provider::JavaProvider;
 
-pub struct CorrettoApi {}
+pub struct CorrettoApi;
 
 impl JavaProvider for CorrettoApi {
     fn jdk_source(

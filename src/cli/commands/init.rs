@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
 use clap::Args;
+use clap::value_parser;
 
 use crate::cli::CommandHandler;
 use crate::context::McContext;
 use crate::ops;
 use crate::ops::init::InitOptions;
+use crate::ops::init::InitPreset;
 use crate::utils::errors::CliResult;
 
 #[derive(Args)]
@@ -19,7 +21,10 @@ pub struct InitCommand {
 
     /// Automatically agree to the Minecraft EULA (https://aka.ms/MinecraftEULA)
     #[arg(long, default_value_t = false)]
-    pub eula: bool
+    pub eula: bool,
+
+    #[arg(long, value_parser = value_parser!(InitPreset), default_value = "optimized")]
+    pub preset: InitPreset
 }
 
 impl CommandHandler for InitCommand {
@@ -27,7 +32,8 @@ impl CommandHandler for InitCommand {
         let options = InitOptions {
             path: context.cwd.join(&self.path),
             name: self.name.clone(),
-            eula: self.eula
+            eula: self.eula,
+            preset: self.preset
         };
 
         ops::init::init(context, &options).await?;

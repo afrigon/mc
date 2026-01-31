@@ -2,17 +2,19 @@ use url::Url;
 
 use crate::crypto::checksum::ChecksumRef;
 use crate::crypto::checksum::RemoteChecksum;
+use crate::env::Architecture;
 use crate::env::Platform;
+use crate::java::JavaVersion;
 use crate::network::artifact::ArtifactSource;
 use crate::services::java_provider::JavaProvider;
 
-pub struct GraalApi {}
+pub struct GraalApi;
 
 impl JavaProvider for GraalApi {
     fn jdk_source(
-        java_version: crate::java::JavaVersion,
-        platform: crate::env::Platform,
-        architecture: crate::env::Architecture
+        java_version: JavaVersion,
+        platform: Platform,
+        architecture: Architecture
     ) -> ArtifactSource {
         let version = java_version.value();
 

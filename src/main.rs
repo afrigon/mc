@@ -1,3 +1,4 @@
+mod capabilities;
 mod cli;
 mod context;
 mod crypto;

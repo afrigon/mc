@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use crate::context::McContext;
 use crate::minecraft::loader::LoaderKind;
+use crate::network;
 use crate::services;
+use crate::services::minecraft_api;
 use crate::services::minecraft_api::MinecraftApiVersionManifestEntry;
 use crate::services::minecraft_api::MinecraftApiVersionType;
 use crate::utils::errors::McResult;
@@ -15,24 +17,29 @@ pub struct MinecraftInstallOptions {
 }
 
 pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions) -> McResult<()> {
-    // TODO: check if already installed
-    // TODO: add confirm, override, etc dialogs
+    let prefix = options
+        .loader
+        .as_ref()
+        .map(|l| l.to_string())
+        .unwrap_or(String::from("minecraft"));
+
+    let name = format!("{}-{}", prefix, options.version);
+    let path = options
+        .minecraft_directory
+        .join(&name)
+        .with_extension("jar");
+
+    if path.exists() {
+        anyhow::bail!("{} is already installed", name);
+    }
+
     // TODO: add progress bar
-    // let manifest = services::minecraft_api::get_manifest(&context.http_client).await?;
 
-    // if let Some(version) = manifest.versions.iter().find(|v| v.id == version_id) {
-    //     let metadata =
-    //         services::minecraft_api::get_metadata(&context.http_client, &version.url).await?;
+    _ = context.shell().status("Installing", name);
 
-    //     let url = &metadata.downloads.server.url;
+    let source = minecraft_api::artifact_source(&context.http_client, &options.version).await?;
 
-    //     services::minecraft_api::download_version(&context.http_client, &url).await?;
-    // } else {
-    //     // TODO: fix this
-    //     // return Err(format!("Could not find minecraft version {}", version_id))
-    // };
-
-    Ok(())
+    network::stream_artifact(&context.http_client, source, &path).await
 }
 
 pub struct MinecraftListOptions {
@@ -70,19 +77,19 @@ pub async fn list(context: &mut McContext, options: &MinecraftListOptions) -> Mc
     for i in 0..count {
         let version = versions[i];
 
-        write!(stdout, "{}", version.id);
+        _ = write!(stdout, "{}", version.id);
 
         if version.id == manifest.latest.release {
-            write!(stdout, " (latest)");
+            _ = write!(stdout, " (latest)");
         } else if version.id == manifest.latest.snapshot {
-            write!(stdout, " (latest-snapshot)");
+            _ = write!(stdout, " (latest-snapshot)");
         }
 
-        write!(stdout, "\n");
+        _ = write!(stdout, "\n");
     }
 
     if rest != 0 {
-        writeln!(stdout, "and {} more. use --all to see all versions", rest);
+        _ = writeln!(stdout, "and {} more. use --all to see all versions", rest);
     };
 
     Ok(())

@@ -1,6 +1,11 @@
 use serde::Deserialize;
 use url::Url;
 
+use crate::crypto::checksum::ChecksumRef;
+use crate::crypto::checksum::LocalChecksum;
+use crate::network::artifact::ArtifactSource;
+use crate::utils::errors::McResult;
+
 const LIST_URL: &'static str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
 #[derive(Deserialize, PartialEq, Eq)]
@@ -58,43 +63,66 @@ pub struct MinecraftApiArtifactMetadata {
     pub sha1: String
 }
 
-// TODO: review the error and types here and in other services
-pub async fn get_manifest(
-    client: &reqwest::Client
-) -> Result<MinecraftApiVersionManifest, reqwest::Error> {
-    client
+pub async fn get_manifest(client: &reqwest::Client) -> McResult<MinecraftApiVersionManifest> {
+    let data = client
         .get(LIST_URL)
         .send()
         .await?
         .error_for_status()?
         .json()
-        .await
+        .await?;
+
+    Ok(data)
+}
+
+pub async fn get_latest_version(client: &reqwest::Client) -> McResult<String> {
+    let data: MinecraftApiVersionManifest = client
+        .get(LIST_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    Ok(data.latest.release)
 }
 
 pub async fn get_metadata(
     client: &reqwest::Client,
     url: &Url
-) -> Result<MinecraftApiVersionMetadata, reqwest::Error> {
-    client
+) -> McResult<MinecraftApiVersionMetadata> {
+    let data = client
         .get(url.clone())
         .send()
         .await?
         .error_for_status()?
         .json()
-        .await
+        .await?;
+
+    Ok(data)
 }
 
-// TODO: move this outside of this service
-pub async fn download_version(client: &reqwest::Client, url: &Url) -> anyhow::Result<()> {
-    // let cache = &Context::current().directories.cache;
-    // let filename = url
-    //     .path_segments()
-    //     .and_then(|s| s.last())
-    //     .filter(|s| !s.is_empty())
-    //     .expect("url must end with a file name");
-    // let output = &Context::current().directories.data
-    //     .join(filename);
-    // network::stream_file(client, url, output, cache).await?;
-    // TODO: add checksum validation
-    Ok(())
+pub async fn artifact_source(
+    client: &reqwest::Client,
+    version: &String
+) -> McResult<ArtifactSource> {
+    let manifest = get_manifest(client).await?;
+    let version = manifest
+        .versions
+        .iter()
+        .find(|entry| entry.id == *version)
+        .ok_or(anyhow::anyhow!("could not find minecraft version"))?;
+
+    let metadata = get_metadata(client, &version.url).await?;
+    let checksum_string = metadata.downloads.server.sha1;
+
+    let mut checksum = [0u8; 20];
+    hex::decode_to_slice(checksum_string, &mut checksum)?;
+
+    let source = ArtifactSource {
+        url: metadata.downloads.server.url,
+        checksum: ChecksumRef::Local(LocalChecksum::sha1(checksum))
+    };
+
+    Ok(source)
 }

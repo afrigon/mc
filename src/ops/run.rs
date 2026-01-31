@@ -1,103 +1,183 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 
+use anyhow::Context;
 use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
 
 use crate::context::McContext;
+use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
+use crate::manifest::raw::RawManifest;
+use crate::ops;
+use crate::ops::eula::EulaOptions;
+use crate::ops::init::InitDirectoriesOptions;
+use crate::ops::java::JavaInstallOptions;
+use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::utils::errors::McResult;
 
 pub struct RunOptions {
     pub manifest_path: PathBuf
 }
 
+fn sanitize_command(command: &Command) -> String {
+    let command = command.as_std();
+
+    let mut command_parts: Vec<String> = Vec::new();
+    command_parts.push(command.get_program().to_string_lossy().into_owned());
+    command_parts.extend(command.get_args().map(|a| a.to_string_lossy().into_owned()));
+
+    command_parts
+        .into_iter()
+        .map(|s| {
+            if s.contains(" ") || s.contains("\t") {
+                format!("{:?}", s)
+            } else {
+                s
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+// TODO: validate error context for all cases.
+// - invalid versions
+// - invalid toml format
+// - missing toml file
+// - etc.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> {
-    let manifest_raw = tokio::fs::read_to_string(&options.manifest_path).await?;
+    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
+        .await
+        .context("could not find mc.toml file")?;
+    let manifest_raw = toml::from_str::<RawManifest>(&manifest_string)?;
 
-    // TODO: check for eula settings before starting the server that is going to fail
-    match toml::from_str::<Manifest>(&manifest_raw) {
-        Ok(manifest) => {
-            // let java_distribution = manifest.java;
-            let current_platform = Platform::current();
+    let mut manifest = Manifest::default(context).await?;
+    manifest.apply(context, &manifest_raw).await?;
 
-            let java_path = match current_platform {
-                Platform::Windows => PathBuf::from("java/bin/javaw.exe"),
-                Platform::Linux => PathBuf::from("java/bin/java"),
-                Platform::MacOS => PathBuf::from("java/Contents/Home/bin/java"),
-                Platform::Unknown => {
-                    anyhow::bail!("the {} platform is not supported", current_platform)
-                }
-            };
+    let path = context.cwd.clone();
+    let server_path = path.join("server");
 
-            let minecraft_path = PathBuf::from("minecraft");
+    let init_directories_options = InitDirectoriesOptions { path: path.clone() };
+    ops::init::init_directories(context, &init_directories_options).await?;
 
-            // TODO: add stdio
-            let mut child = tokio::process::Command::new(java_path)
-                .arg("-jar")
-                .arg("server.jar")
-                .arg("--nogui")
-                .stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .current_dir(&minecraft_path)
-                .kill_on_drop(true)
-                .spawn()?;
+    // EULA
 
-            // Take the pipes
-            let mut child_stdin = child.stdin.take().expect("child stdin");
-            let child_stdout = child.stdout.take().expect("child stdout");
-            let child_stderr = child.stderr.take().expect("child stderr");
+    if manifest.minecraft.eula == true {
+        let eula_options = EulaOptions {
+            accept: true,
+            manifest_path: None,
+            server_path: server_path.clone()
+        };
 
-            // Pipe child's stdout/stderr -> parent stdout/stderr
-            let stdout_task = tokio::spawn(async move {
-                let mut out = tokio::io::stdout();
+        ops::eula::eula(context, &eula_options).await?;
+    } else {
+        let eula_options = EulaOptions {
+            accept: false,
+            manifest_path: None,
+            server_path: server_path.clone()
+        };
 
-                tokio::io::copy(&mut tokio::io::BufReader::new(child_stdout), &mut out).await
-            });
+        ops::eula::eula(context, &eula_options).await?;
 
-            let stderr_task = tokio::spawn(async move {
-                let mut err = tokio::io::stderr();
+        anyhow::bail!(
+            "the server will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`"
+        );
+    }
 
-                tokio::io::copy(&mut tokio::io::BufReader::new(child_stderr), &mut err).await
-            });
+    // JAVA
 
-            // Pipe parent stdin -> child's stdin
-            let stdin_task = tokio::spawn(async move {
-                let mut input = tokio::io::stdin();
+    let java_directory = path.join("java");
+    let java_path = java_directory.join(manifest.java.version.to_string());
+    let current_platform = Platform::current();
 
-                let _ = tokio::io::copy(&mut input, &mut child_stdin).await;
+    if !java_path.exists() {
+        let java_install_options = JavaInstallOptions {
+            architecture: Architecture::current(),
+            platform: current_platform,
+            version: manifest.java.version,
+            java_directory
+        };
 
-                // If parent stdin closes, close child's stdin too
-                let _ = child_stdin.shutdown().await;
+        ops::java::install(context, &java_install_options).await?;
+    }
 
-                Ok::<(), std::io::Error>(())
-            });
+    let java_bin = match current_platform {
+        Platform::Windows => "javaw.exe",
+        _ => "java"
+    };
+    let java_bin_path = java_path.join("bin").join(java_bin);
 
-            tokio::select! {
-                _ = child.wait() => {
+    // MINECRAFT
 
-                }
-                _ = tokio::signal::ctrl_c() => {
-                    child.kill().await?
-                    // TODO: ask server to terminate instead of kill.
-                    // TODO: fallback to kill, maybe with an extra warning ?
-                }
-            };
+    let minecraft_directory = path.join("minecraft");
+    let minecraft_descriptor_prefix = manifest
+        .minecraft
+        .loader
+        .as_ref()
+        .map(|l| l.to_string())
+        .unwrap_or(String::from("minecraft"));
 
-            stdin_task.abort();
-            stdout_task.abort();
-            stderr_task.abort();
+    let minecraft_descriptor = format!(
+        "{}-{}",
+        minecraft_descriptor_prefix, manifest.minecraft.version
+    );
 
-            let _ = tokio::join!(stdin_task, stdout_task, stderr_task);
+    let minecraft_path = minecraft_directory
+        .join(minecraft_descriptor)
+        .join("server.jar");
 
-            // TODO: live backups
-            // TODO: make sure version is > alpha v1.0.16_01 before doing live backups
+    if !minecraft_path.exists() {
+        let minecraft_install_options = MinecraftInstallOptions {
+            version: manifest.minecraft.version,
+            loader: manifest.minecraft.loader,
+            minecraft_directory
+        };
+
+        ops::minecraft::install(context, &minecraft_install_options).await?;
+    }
+
+    // TODO: fetch capabilities
+
+    // PROPERTIES
+
+    // MODS
+
+    // PROCESS
+
+    let mut command = tokio::process::Command::new(java_bin_path);
+
+    command
+        .arg("-jar")
+        .arg(minecraft_path.as_os_str())
+        .arg("--nogui")
+        .current_dir(&server_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+
+    let command_string = sanitize_command(&command);
+    _ = context
+        .shell()
+        .status("Running", format!("`{}`", command_string));
+
+    let mut child = command.spawn()?;
+
+    tokio::select! {
+        _ = child.wait() => {
+
         }
-        Err(error) => {
-            println!("There is something wrong with the manifest file: {}", error);
+        _ = tokio::signal::ctrl_c() => {
+            // TODO: rcon save + stop instead of kill
+            // TODO: release the lock
+
+            child.kill().await?
         }
     };
+
+    // TODO: live backups
+    // TODO: make sure version is > alpha v1.0.16_01 before doing live backups
 
     Ok(())
 }
