@@ -3,6 +3,7 @@ use url::Url;
 
 use crate::crypto::checksum::ChecksumRef;
 use crate::crypto::checksum::LocalChecksum;
+use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
 use crate::utils::errors::McResult;
 
@@ -44,22 +45,18 @@ pub struct MinecraftApiVersionManifestEntry {
 
 #[derive(Deserialize)]
 pub struct MinecraftApiVersionMetadata {
-    pub id: String,
     pub downloads: MinecraftApiVersionMetadataDownloads
 }
 
 #[derive(Deserialize)]
 pub struct MinecraftApiVersionMetadataDownloads {
     pub client: MinecraftApiArtifactMetadata,
-    pub client_mappings: MinecraftApiArtifactMetadata,
-    pub server: MinecraftApiArtifactMetadata,
-    pub server_mappings: MinecraftApiArtifactMetadata
+    pub server: MinecraftApiArtifactMetadata
 }
 
 #[derive(Deserialize)]
 pub struct MinecraftApiArtifactMetadata {
     pub url: Url,
-    pub size: usize,
     pub sha1: String
 }
 
@@ -121,7 +118,8 @@ pub async fn artifact_source(
 
     let source = ArtifactSource {
         url: metadata.downloads.server.url,
-        checksum: ChecksumRef::Local(LocalChecksum::sha1(checksum))
+        kind: ArtifactKind::Jar,
+        checksum: Some(ChecksumRef::Local(LocalChecksum::sha1(checksum)))
     };
 
     Ok(source)

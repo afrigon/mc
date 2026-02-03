@@ -15,7 +15,7 @@ pub struct InitCommand {
     #[arg(default_value = ".")]
     pub path: PathBuf,
 
-    /// Set the resulting server name, defaults to the directory name
+    /// Set the resulting instance name, defaults to the directory name
     #[arg(long)]
     pub name: Option<String>,
 

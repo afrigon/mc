@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 
 use anyhow::Context;
-use tokio::io::AsyncWriteExt;
+use lockfile::Lockfile;
 use tokio::process::Command;
 
 use crate::context::McContext;
@@ -47,6 +47,9 @@ fn sanitize_command(command: &Command) -> String {
 // - missing toml file
 // - etc.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> {
+    let lockfile = Lockfile::create(context.cwd.join("mc.lock"))
+        .context("this instance is already running")?;
+
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
         .context("could not find mc.toml file")?;
@@ -56,18 +59,18 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     manifest.apply(context, &manifest_raw).await?;
 
     let path = context.cwd.clone();
-    let server_path = path.join("server");
+    let instance_path = path.join("instance");
 
     let init_directories_options = InitDirectoriesOptions { path: path.clone() };
     ops::init::init_directories(context, &init_directories_options).await?;
 
     // EULA
 
-    if manifest.minecraft.eula == true {
+    if manifest.server.eula == true {
         let eula_options = EulaOptions {
             accept: true,
             manifest_path: None,
-            server_path: server_path.clone()
+            instance_path: instance_path.clone()
         };
 
         ops::eula::eula(context, &eula_options).await?;
@@ -75,13 +78,13 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         let eula_options = EulaOptions {
             accept: false,
             manifest_path: None,
-            server_path: server_path.clone()
+            instance_path: instance_path.clone()
         };
 
         ops::eula::eula(context, &eula_options).await?;
 
         anyhow::bail!(
-            "the server will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`"
+            "the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`"
         );
     }
 
@@ -151,7 +154,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         .arg("-jar")
         .arg(minecraft_path.as_os_str())
         .arg("--nogui")
-        .current_dir(&server_path)
+        .current_dir(&instance_path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -178,6 +181,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     // TODO: live backups
     // TODO: make sure version is > alpha v1.0.16_01 before doing live backups
+
+    lockfile.release()?;
 
     Ok(())
 }

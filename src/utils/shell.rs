@@ -224,7 +224,7 @@ mod platform_shell {
             }
 
             let mut csbi: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-            let rc = GetConsoleScreenBufferInfo(h, &mut csbi);
+            _ = GetConsoleScreenBufferInfo(h, &mut csbi);
 
             CloseHandle(h);
 

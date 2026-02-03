@@ -19,6 +19,6 @@ pub enum CliCommand {
     /// Create a new mc package in an existing directory
     Init(InitCommand),
 
-    /// Run the Minecraft server
+    /// Run the Minecraft instance
     Run(RunCommand)
 }

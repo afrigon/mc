@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use chrono::Local;
 use chrono::Utc;
 use chrono_tz::Tz;
 
@@ -12,7 +11,7 @@ use crate::utils::errors::McResult;
 pub struct EulaOptions {
     pub accept: bool,
     pub manifest_path: Option<PathBuf>,
-    pub server_path: PathBuf
+    pub instance_path: PathBuf
 }
 
 pub async fn eula(context: &mut McContext, options: &EulaOptions) -> McResult<()> {
@@ -20,7 +19,7 @@ pub async fn eula(context: &mut McContext, options: &EulaOptions) -> McResult<()
         // TODO: edit the manifest
     }
 
-    let eula_path = options.server_path.join("eula.txt");
+    let eula_path = options.instance_path.join("eula.txt");
     let mut eula = toml_edit::DocumentMut::new();
 
     let mut eula_value = toml_edit::value(options.accept);

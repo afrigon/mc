@@ -4,7 +4,6 @@ use crate::context::McContext;
 use crate::minecraft::loader::LoaderKind;
 use crate::network;
 use crate::services;
-use crate::services::minecraft_api;
 use crate::services::minecraft_api::MinecraftApiVersionManifestEntry;
 use crate::services::minecraft_api::MinecraftApiVersionType;
 use crate::utils::errors::McResult;
@@ -24,10 +23,9 @@ pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions)
         .unwrap_or(String::from("minecraft"));
 
     let name = format!("{}-{}", prefix, options.version);
-    let path = options
-        .minecraft_directory
-        .join(&name)
-        .with_extension("jar");
+    let directory = options.minecraft_directory.join(&name);
+
+    let path = directory.join("server.jar");
 
     if path.exists() {
         anyhow::bail!("{} is already installed", name);
@@ -37,7 +35,23 @@ pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions)
 
     _ = context.shell().status("Installing", name);
 
-    let source = minecraft_api::artifact_source(&context.http_client, &options.version).await?;
+    tokio::fs::create_dir_all(&directory).await?;
+
+    // TODO: use different api based on loader
+    let source = if let Some(ref loader) = options.loader {
+        match loader.product {
+            LoaderKind::Fabric => {
+                services::fabric_api::artifact_source(
+                    &context.http_client,
+                    loader,
+                    &options.version
+                )
+                .await?
+            }
+        }
+    } else {
+        services::minecraft_api::artifact_source(&context.http_client, &options.version).await?
+    };
 
     network::stream_artifact(&context.http_client, source, &path).await
 }

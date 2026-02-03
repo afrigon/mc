@@ -1,13 +1,10 @@
 pub mod raw;
 
-use serde::Deserialize;
-
 use crate::context::McContext;
 use crate::java::JavaDescriptor;
 use crate::java::JavaVendor;
 use crate::java::JavaVersion;
 use crate::manifest::raw::RawManifest;
-use crate::minecraft::loader;
 use crate::minecraft::loader::LoaderKind;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::resolvers::java::JavaVersionResolver;
@@ -34,12 +31,12 @@ pub struct ManifestJava {
 
 pub struct ManifestMinecraft {
     pub version: String,
-    pub loader: Option<ProductDescriptor<LoaderKind>>,
-    pub seed: MinecraftSeed,
-    pub eula: bool
+    pub loader: Option<ProductDescriptor<LoaderKind>>
 }
 
 pub struct ManifestServer {
+    pub seed: MinecraftSeed,
+    pub eula: bool,
     pub port: u16,
     pub rcon_port: u16
 }
@@ -69,11 +66,11 @@ impl Manifest {
             },
             minecraft: ManifestMinecraft {
                 version: minecraft_latest,
-                loader: None,
-                seed: MinecraftSeed::random(),
-                eula: false
+                loader: None
             },
             server: ManifestServer {
+                seed: MinecraftSeed::random(),
+                eula: false,
                 port: 25565,
                 rcon_port: 25575
             },
@@ -107,17 +104,17 @@ impl Manifest {
                     LoaderVersionResolver::resolve_descriptor(context, loader.clone()).await?;
                 self.minecraft.loader = Some(descriptor)
             }
-
-            if let Some(ref seed) = minecraft.seed {
-                self.minecraft.seed = seed.clone()
-            }
-
-            if let Some(eula) = minecraft.eula {
-                self.minecraft.eula = eula
-            }
         }
 
         if let Some(ref server) = raw.server {
+            if let Some(ref seed) = server.seed {
+                self.server.seed = seed.clone()
+            }
+
+            if let Some(eula) = server.eula {
+                self.server.eula = eula
+            }
+
             if let Some(port) = server.port {
                 self.server.port = port
             }

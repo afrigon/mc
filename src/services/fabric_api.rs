@@ -1,7 +1,12 @@
 use anyhow::Context;
 use serde::Deserialize;
+use url::Url;
 
+use crate::minecraft::loader::LoaderKind;
+use crate::network::artifact::ArtifactKind;
+use crate::network::artifact::ArtifactSource;
 use crate::utils::errors::McResult;
+use crate::utils::product_descriptor::ProductDescriptor;
 
 #[derive(Deserialize)]
 struct FabricApiVersion {
@@ -10,14 +15,33 @@ struct FabricApiVersion {
 
 #[derive(Deserialize)]
 pub struct FabricApiLoaderVersion {
-    pub version: String,
-    pub stable: bool
+    pub version: String
 }
 
 #[derive(Deserialize)]
 pub struct FabricApiInstallerVersion {
-    pub version: String,
-    pub stable: bool
+    pub version: String
+}
+
+pub async fn artifact_source(
+    client: &reqwest::Client,
+    loader: &ProductDescriptor<LoaderKind>,
+    version: &String
+) -> McResult<ArtifactSource> {
+    let installer = get_latest_installer(client).await?.version;
+
+    let url = format!(
+        "https://meta.fabricmc.net/v2/versions/loader/{}/{}/{}/server/jar",
+        version, loader.version, installer
+    );
+
+    let source = ArtifactSource {
+        url: Url::parse(&url)?,
+        kind: ArtifactKind::Jar,
+        checksum: None
+    };
+
+    Ok(source)
 }
 
 pub async fn get_versions(client: &reqwest::Client) -> McResult<Vec<FabricApiLoaderVersion>> {
@@ -57,21 +81,6 @@ pub async fn get_versions_for_game(
         .collect::<Vec<FabricApiLoaderVersion>>();
 
     Ok(versions)
-}
-
-pub async fn get_installer_versions(
-    client: &reqwest::Client
-) -> McResult<Vec<FabricApiInstallerVersion>> {
-    client
-        .get("https://meta.fabricmc.net/v2/versions/installer")
-        .send()
-        .await
-        .context("could not send HTTP request")?
-        .error_for_status()
-        .context("could not get fabric installer versions")?
-        .json::<Vec<FabricApiInstallerVersion>>()
-        .await
-        .context("could not parse json from fabric installer versions")
 }
 
 pub async fn get_latest_installer(client: &reqwest::Client) -> McResult<FabricApiInstallerVersion> {

@@ -18,5 +18,5 @@
         - [mc version](./commands/version.md)
     - [Manifest Commands](./commands/manifest.md)
         - [mc init](./commands/init.md)
-    - [Server Commands](./commands/server.md)
+    - [Instance Commands](./commands/instance.md)
         - [mc run](./commands/run.md)

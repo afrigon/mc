@@ -21,8 +21,8 @@ enum ErrorKind {
     }
 }
 
-pub fn validate_server_name(name: &str) -> Result<()> {
-    validate_name(name, "server name")
+pub fn validate_instance_name(name: &str) -> Result<()> {
+    validate_name(name, "instance name")
 }
 
 fn validate_name(name: &str, what: &'static str) -> Result<()> {

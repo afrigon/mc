@@ -5,6 +5,7 @@ use crate::crypto::checksum::RemoteChecksum;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::java::JavaVersion;
+use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
 use crate::services::java_provider::JavaProvider;
 
@@ -29,9 +30,18 @@ impl JavaProvider for GraalApi {
         ))
         .unwrap();
 
-        let checksum_url = Url::parse(&format!("{}.sha256", url.as_str())).unwrap();
-        let checksum = ChecksumRef::Remote(RemoteChecksum::sha256(checksum_url));
+        let kind = match platform {
+            Platform::Windows => ArtifactKind::Zip,
+            _ => ArtifactKind::TarGz
+        };
 
-        ArtifactSource { url, checksum }
+        let checksum_url = Url::parse(&format!("{}.sha256", url.as_str())).unwrap();
+        let checksum = Some(ChecksumRef::Remote(RemoteChecksum::sha256(checksum_url)));
+
+        ArtifactSource {
+            url,
+            kind,
+            checksum
+        }
     }
 }

@@ -32,6 +32,8 @@ pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> M
 
     _ = context.shell().status("Installing", name);
 
+    tokio::fs::create_dir_all(&path).await?;
+
     let source = match options.version.product {
         JavaVendor::correto => corretto_api::CorrettoApi::jdk_source(
             options.version.version,
@@ -45,7 +47,7 @@ pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> M
         )
     };
 
-    network::stream_and_deflate(&context.http_client, source, &path).await
+    network::stream_artifact(&context.http_client, source, &path).await
 }
 
 pub struct JavaListOptions {}

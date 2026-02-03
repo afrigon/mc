@@ -22,13 +22,13 @@ pub struct RawManifestJava {
 #[derive(Deserialize)]
 pub struct RawManifestMinecraft {
     pub version: Option<String>,
-    pub loader: Option<RawProductDescriptor>,
-    pub seed: Option<MinecraftSeed>,
-    pub eula: Option<bool>
+    pub loader: Option<RawProductDescriptor>
 }
 
 #[derive(Deserialize)]
 pub struct RawManifestServer {
+    pub seed: Option<MinecraftSeed>,
+    pub eula: Option<bool>,
     pub port: Option<u16>,
     pub rcon_port: Option<u16>
 }

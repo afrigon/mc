@@ -63,7 +63,6 @@ async fn main() {
     let color_choice = cli.globals.color;
     context.shell().set_color_choice(color_choice);
 
-    // TODO: add lockfile checks here to make sure we're not trying to edit / backup the server while its running... or various other edge cases.
     match run(&cli, &mut context).await {
         Err(e) => exit_with_error(e, &mut context.shell()),
         Ok(()) => {}

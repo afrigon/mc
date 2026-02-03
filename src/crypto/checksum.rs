@@ -20,6 +20,24 @@ pub enum LocalChecksum {
     sha256([u8; 32])
 }
 
+impl LocalChecksum {
+    pub fn algorithm(&self) -> ChecksumAlgorithm {
+        match self {
+            LocalChecksum::md5(_) => ChecksumAlgorithm::md5,
+            LocalChecksum::sha1(_) => ChecksumAlgorithm::sha1,
+            LocalChecksum::sha256(_) => ChecksumAlgorithm::sha256
+        }
+    }
+
+    pub fn hash(&self) -> &[u8] {
+        match self {
+            LocalChecksum::md5(data) => data,
+            LocalChecksum::sha1(data) => data,
+            LocalChecksum::sha256(data) => data
+        }
+    }
+}
+
 pub struct RemoteChecksum {
     pub url: Url,
     pub algorithm: ChecksumAlgorithm

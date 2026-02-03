@@ -1,7 +1,11 @@
 .DS_Store
 /target
+
 /java
 /minecraft
-/server
+/instance
 /mc.toml
+
+/temp
+
 .todo

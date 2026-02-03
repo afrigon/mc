@@ -1,2 +1,2 @@
 pub mod checksum;
-pub mod hashing;
+pub mod hash;
