@@ -1,8 +1,11 @@
+use std::fs;
+use std::path::PathBuf;
+
 use anyhow::Context;
 use serde::Deserialize;
 use url::Url;
 
-use crate::minecraft::loader::LoaderKind;
+use crate::mods::loader::LoaderKind;
 use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
 use crate::utils::errors::McResult;
@@ -97,4 +100,22 @@ pub async fn get_latest_installer(client: &reqwest::Client) -> McResult<FabricAp
         .into_iter()
         .next()
         .ok_or_else(|| anyhow::anyhow!("could not find a fabric installer version"))
+}
+
+#[derive(Deserialize)]
+pub struct FabricModMetadata {
+    pub id: String,
+    pub version: String
+}
+
+pub async fn parse_jar_metadata(path: PathBuf) -> McResult<FabricModMetadata> {
+    let file = fs::File::open(&path)?;
+
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    let fabric_file = archive.by_name("fabric.mod.json")?;
+
+    let metadata = serde_json::from_reader(fabric_file)?;
+
+    Ok(metadata)
 }

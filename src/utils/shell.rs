@@ -153,7 +153,6 @@ impl Shell {
 }
 
 #[cfg(unix)]
-
 mod platform_shell {
     use std::mem;
 
@@ -177,7 +176,6 @@ mod platform_shell {
 }
 
 #[cfg(windows)]
-
 mod platform_shell {
     use std::mem;
     use std::ptr;

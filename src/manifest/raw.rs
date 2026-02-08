@@ -1,6 +1,11 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use serde::Deserialize;
+use url::Url;
 
 use crate::minecraft::seed::MinecraftSeed;
+use crate::mods::service::ModServiceKind;
 use crate::utils::product_descriptor::RawProductDescriptor;
 
 #[derive(Deserialize)]
@@ -10,7 +15,7 @@ pub struct RawManifest {
     pub java: Option<RawManifestJava>,
     pub minecraft: Option<RawManifestMinecraft>,
     pub server: Option<RawManifestServer>,
-    pub mods: Option<RawManifestMods>,
+    pub mods: Option<HashMap<String, RawManifestMod>>,
     pub backups: Option<RawManifestBackups>
 }
 
@@ -34,12 +39,18 @@ pub struct RawManifestServer {
 }
 
 #[derive(Deserialize)]
-pub struct RawManifestMods {
-    pub mods: Option<Vec<RawManifestMod>>
+#[serde(untagged)]
+pub enum RawManifestMod {
+    Version(String),
+    Detailed(RawDetailedManifestMod),
+    Remote(Url)
 }
 
 #[derive(Deserialize)]
-pub struct RawManifestMod {}
+pub struct RawDetailedManifestMod {
+    pub version: String,
+    pub service: Option<ModServiceKind>
+}
 
 #[derive(Deserialize)]
 pub struct RawManifestBackups {

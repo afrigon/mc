@@ -1,24 +1,38 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::str::FromStr;
 
 use anyhow::Context;
-use lockfile::Lockfile;
 use tokio::process::Command;
 
 use crate::context::McContext;
+use crate::crypto::checksum::ChecksumRef;
+use crate::crypto::checksum::LocalChecksum;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
+use crate::manifest::lock;
+use crate::manifest::lock::ModLockfile;
+use crate::manifest::lock::ModLockfileSource;
 use crate::manifest::raw::RawManifest;
+use crate::network;
+use crate::network::artifact::ArtifactKind;
+use crate::network::artifact::ArtifactSource;
 use crate::ops;
 use crate::ops::eula::EulaOptions;
 use crate::ops::init::InitDirectoriesOptions;
 use crate::ops::java::JavaInstallOptions;
 use crate::ops::minecraft::MinecraftInstallOptions;
+use crate::ops::mods::SyncModsOptions;
+use crate::services;
 use crate::utils::errors::McResult;
+use crate::utils::product_descriptor::RawProductDescriptor;
 
 pub struct RunOptions {
-    pub manifest_path: PathBuf
+    pub manifest_path: PathBuf,
+    pub lockfile_path: PathBuf
 }
 
 fn sanitize_command(command: &Command) -> String {
@@ -47,8 +61,7 @@ fn sanitize_command(command: &Command) -> String {
 // - missing toml file
 // - etc.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> {
-    let lockfile = Lockfile::create(context.cwd.join("mc.lock"))
-        .context("this instance is already running")?;
+    // TODO: make sure the server is running only once?
 
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
@@ -132,8 +145,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     if !minecraft_path.exists() {
         let minecraft_install_options = MinecraftInstallOptions {
-            version: manifest.minecraft.version,
-            loader: manifest.minecraft.loader,
+            version: manifest.minecraft.version.clone(),
+            loader: manifest.minecraft.loader.clone(),
             minecraft_directory
         };
 
@@ -145,6 +158,15 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     // PROPERTIES
 
     // MODS
+
+    let sync_options = SyncModsOptions {
+        game_version: manifest.minecraft.version.clone(),
+        loader: manifest.minecraft.loader,
+        lockfile_path: options.lockfile_path.clone(),
+        mods_path: instance_path.join("mods")
+    };
+
+    ops::mods::sync(context, &sync_options, &manifest.mods).await?;
 
     // PROCESS
 
@@ -180,9 +202,6 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     };
 
     // TODO: live backups
-    // TODO: make sure version is > alpha v1.0.16_01 before doing live backups
-
-    lockfile.release()?;
 
     Ok(())
 }

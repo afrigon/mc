@@ -4,7 +4,7 @@ use clap::value_parser;
 
 use crate::cli::CommandHandler;
 use crate::context::McContext;
-use crate::minecraft::loader::LoaderKind;
+use crate::mods::loader::LoaderKind;
 use crate::ops;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::minecraft::MinecraftListLoadersOptions;

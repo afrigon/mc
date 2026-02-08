@@ -1,5 +1,5 @@
 use crate::context::McContext;
-use crate::minecraft::loader::LoaderKind;
+use crate::mods::loader::LoaderKind;
 use crate::resolvers::fabric::FabricVersionResolver;
 use crate::utils;
 use crate::utils::errors::McResult;

@@ -1,7 +1,8 @@
 use rand::Rng;
 use serde::Deserialize;
+use serde::Serialize;
 
-#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum MinecraftSeed {
     Numeric(i64),

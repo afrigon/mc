@@ -4,7 +4,11 @@ use std::sync::Mutex;
 use std::sync::MutexGuard;
 
 use anyhow::Context;
+use reqwest::header::HeaderMap;
+use reqwest::header::HeaderValue;
+use reqwest::header::USER_AGENT;
 
+use crate::utils::errors::McResult;
 use crate::utils::shell::Shell;
 
 pub struct McContext {
@@ -14,20 +18,33 @@ pub struct McContext {
 }
 
 impl McContext {
-    pub fn new(shell: Shell, cwd: PathBuf) -> McContext {
-        McContext {
+    pub fn new(shell: Shell, cwd: PathBuf) -> McResult<McContext> {
+        let mut headers = HeaderMap::new();
+        let user_agent = format!(
+            "afrigon/{}/{}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        );
+
+        headers.insert(USER_AGENT, HeaderValue::from_str(&user_agent)?);
+
+        let http_client = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()?;
+
+        Ok(McContext {
             shell: Mutex::new(shell),
             cwd,
-            http_client: reqwest::Client::new()
-        }
+            http_client
+        })
     }
 
-    pub fn default() -> anyhow::Result<McContext> {
+    pub fn default() -> McResult<McContext> {
         let shell = Shell::new();
 
         let cwd = env::current_dir().context("could not get the current working directory")?;
 
-        Ok(McContext::new(shell, cwd))
+        Ok(McContext::new(shell, cwd)?)
     }
 
     pub fn shell(&self) -> MutexGuard<'_, Shell> {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::context::McContext;
-use crate::minecraft::loader::LoaderKind;
+use crate::mods::loader::LoaderKind;
 use crate::network;
 use crate::services;
 use crate::services::minecraft_api::MinecraftApiVersionManifestEntry;

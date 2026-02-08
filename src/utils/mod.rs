@@ -3,6 +3,7 @@ pub mod errors;
 pub mod product_descriptor;
 pub mod restricted_names;
 pub mod shell;
+pub mod toml;
 pub mod verbosity;
 
 pub use case_iterable::CaseIterable;

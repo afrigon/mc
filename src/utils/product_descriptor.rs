@@ -7,7 +7,7 @@ use crate::context::McContext;
 use crate::utils::errors::McResult;
 
 /// A raw product descriptor is an object that describe a product at a given version. The version might be an alias or not exist at all
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct RawProductDescriptor {
     pub product: String,
     pub version: Option<String>
@@ -43,6 +43,16 @@ impl<'de> Deserialize<'de> for RawProductDescriptor {
         let s = String::deserialize(deserializer)?;
 
         s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl fmt::Display for RawProductDescriptor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref version) = self.version {
+            write!(f, "{}@{}", self.product, version)
+        } else {
+            write!(f, "{}", self.product)
+        }
     }
 }
 

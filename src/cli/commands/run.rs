@@ -31,7 +31,8 @@ pub struct RunCommand {
 impl CommandHandler for RunCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = RunOptions {
-            manifest_path: context.cwd.join(&self.manifest_path)
+            manifest_path: context.cwd.join(&self.manifest_path),
+            lockfile_path: context.cwd.join(&self.manifest_path).with_extension("lock")
         };
 
         ops::run::run(context, &options).await?;

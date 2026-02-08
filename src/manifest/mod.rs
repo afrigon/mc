@@ -1,12 +1,22 @@
+pub mod lock;
 pub mod raw;
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+use url::Url;
 
 use crate::context::McContext;
 use crate::java::JavaDescriptor;
 use crate::java::JavaVendor;
 use crate::java::JavaVersion;
 use crate::manifest::raw::RawManifest;
-use crate::minecraft::loader::LoaderKind;
+use crate::manifest::raw::RawManifestMod;
+use crate::minecraft::MinecraftDifficulty;
+use crate::minecraft::MinecraftGamemode;
 use crate::minecraft::seed::MinecraftSeed;
+use crate::mods::loader::LoaderKind;
+use crate::mods::service::ModServiceKind;
 use crate::resolvers::java::JavaVersionResolver;
 use crate::resolvers::loader::LoaderVersionResolver;
 use crate::resolvers::minecraft::MinecraftVersionResolver;
@@ -16,13 +26,22 @@ use crate::utils::product_descriptor::ProductDescriptor;
 use crate::utils::product_descriptor::VersionResolver;
 
 pub struct Manifest {
-    name: String,
-
+    pub name: String,
     pub java: ManifestJava,
     pub minecraft: ManifestMinecraft,
     pub server: ManifestServer,
-    pub mods: ManifestMods,
+    pub mods: HashMap<String, ManifestMod>,
     pub backups: ManifestBackups
+}
+
+pub enum ManifestMod {
+    Detailed(DetailedManifestMod),
+    Remote(Url)
+}
+
+pub struct DetailedManifestMod {
+    pub version: String,
+    pub service: ModServiceKind
 }
 
 pub struct ManifestJava {
@@ -35,17 +54,15 @@ pub struct ManifestMinecraft {
 }
 
 pub struct ManifestServer {
+    pub gamemode: MinecraftGamemode,
+    pub difficulty: MinecraftDifficulty,
+    pub hardcore: bool,
     pub seed: MinecraftSeed,
     pub eula: bool,
+    pub ip: Option<String>,
     pub port: u16,
     pub rcon_port: u16
 }
-
-pub struct ManifestMods {
-    pub mods: Vec<ManifestMod>
-}
-
-pub struct ManifestMod {}
 
 pub struct ManifestBackups {
     pub enabled: bool
@@ -74,7 +91,7 @@ impl Manifest {
                 port: 25565,
                 rcon_port: 25575
             },
-            mods: ManifestMods { mods: vec![] },
+            mods: HashMap::new(),
             backups: ManifestBackups { enabled: true }
         })
     }
@@ -124,7 +141,27 @@ impl Manifest {
             }
         }
 
-        if let Some(ref mods) = raw.mods {}
+        if let Some(ref mods) = raw.mods {
+            for (k, v) in mods {
+                let m = match v {
+                    RawManifestMod::Version(version) => {
+                        ManifestMod::Detailed(DetailedManifestMod {
+                            version: version.clone(),
+                            service: ModServiceKind::Modrinth
+                        })
+                    }
+                    RawManifestMod::Detailed(detailed) => {
+                        ManifestMod::Detailed(DetailedManifestMod {
+                            version: detailed.version.clone(),
+                            service: detailed.service.unwrap_or_default()
+                        })
+                    }
+                    RawManifestMod::Remote(url) => ManifestMod::Remote(url.clone())
+                };
+
+                self.mods.insert(k.clone(), m);
+            }
+        }
 
         if let Some(ref backups) = raw.backups {
             if let Some(enabled) = backups.enabled {
