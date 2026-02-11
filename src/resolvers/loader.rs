@@ -10,7 +10,7 @@ use crate::utils::product_descriptor::VersionResolver;
 pub struct LoaderVersionResolver;
 
 impl VersionResolver<LoaderKind> for LoaderVersionResolver {
-    async fn resolve(context: &McContext, version: Option<String>) -> McResult<String> {
+    async fn resolve(_: &McContext, _: Option<&str>) -> McResult<String> {
         Err(utils::errors::internal(
             "LoaderVersionResolver::resolve() cannot be called explicitly"
         ))
@@ -18,7 +18,7 @@ impl VersionResolver<LoaderKind> for LoaderVersionResolver {
 
     async fn resolve_descriptor(
         context: &McContext,
-        descriptor: RawProductDescriptor
+        descriptor: &RawProductDescriptor
     ) -> McResult<ProductDescriptor<LoaderKind, String>> {
         match descriptor.product.as_str() {
             "fabric" => FabricVersionResolver::resolve_descriptor(context, descriptor).await,

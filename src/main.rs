@@ -81,7 +81,9 @@ async fn run(cli: &Cli, context: &mut McContext) -> CliResult {
         CliCommand::Java(command) => match &command.command {
             JavaSubcommand::Install(command) => command.handle(context).await,
             JavaSubcommand::List(command) => command.handle(context).await
-        }
+        },
+        CliCommand::Add(command) => command.handle(context).await,
+        CliCommand::Remove(command) => command.handle(context).await
     }
 }
 

@@ -5,9 +5,9 @@ use clap::value_parser;
 
 use crate::cli::CommandHandler;
 use crate::context::McContext;
+use crate::manifest::presets::ManifestPreset;
 use crate::ops;
 use crate::ops::init::InitOptions;
-use crate::ops::init::InitPreset;
 use crate::utils::errors::CliResult;
 
 #[derive(Args)]
@@ -23,8 +23,8 @@ pub struct InitCommand {
     #[arg(long, default_value_t = false)]
     pub eula: bool,
 
-    #[arg(long, value_parser = value_parser!(InitPreset), default_value = "optimized")]
-    pub preset: InitPreset
+    #[arg(long, value_parser = value_parser!(ManifestPreset), default_value = "optimized")]
+    pub preset: ManifestPreset
 }
 
 impl CommandHandler for InitCommand {

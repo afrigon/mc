@@ -1138,7 +1138,6 @@ dependencies = [
  "libc",
  "md-5",
  "minecraft-client-rs",
- "rand",
  "reqwest",
  "serde",
  "serde-java-properties",

@@ -1,34 +1,21 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Stdio;
-use std::str::FromStr;
 
 use anyhow::Context;
 use tokio::process::Command;
 
 use crate::context::McContext;
-use crate::crypto::checksum::ChecksumRef;
-use crate::crypto::checksum::LocalChecksum;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
-use crate::manifest::lock;
-use crate::manifest::lock::ModLockfile;
-use crate::manifest::lock::ModLockfileSource;
-use crate::manifest::raw::RawManifest;
-use crate::network;
-use crate::network::artifact::ArtifactKind;
-use crate::network::artifact::ArtifactSource;
+use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
-use crate::ops::eula::EulaOptions;
+use crate::ops::eula::EulaApplyOptions;
 use crate::ops::init::InitDirectoriesOptions;
 use crate::ops::java::JavaInstallOptions;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
-use crate::services;
 use crate::utils::errors::McResult;
-use crate::utils::product_descriptor::RawProductDescriptor;
 
 pub struct RunOptions {
     pub manifest_path: PathBuf,
@@ -66,10 +53,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
         .context("could not find mc.toml file")?;
-    let manifest_raw = toml::from_str::<RawManifest>(&manifest_string)?;
-
-    let mut manifest = Manifest::default(context).await?;
-    manifest.apply(context, &manifest_raw).await?;
+    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
 
     let path = context.cwd.clone();
     let instance_path = path.join("instance");
@@ -79,27 +63,18 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     // EULA
 
-    if manifest.server.eula == true {
-        let eula_options = EulaOptions {
-            accept: true,
-            manifest_path: None,
-            instance_path: instance_path.clone()
-        };
-
-        ops::eula::eula(context, &eula_options).await?;
-    } else {
-        let eula_options = EulaOptions {
-            accept: false,
-            manifest_path: None,
-            instance_path: instance_path.clone()
-        };
-
-        ops::eula::eula(context, &eula_options).await?;
-
+    if !manifest.server.eula {
         anyhow::bail!(
             "the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`"
         );
     }
+
+    let eula_options = EulaApplyOptions {
+        accept: manifest.server.eula,
+        instance_path: instance_path.clone()
+    };
+
+    ops::eula::apply(context, &eula_options).await?;
 
     // JAVA
 
@@ -111,7 +86,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         let java_install_options = JavaInstallOptions {
             architecture: Architecture::current(),
             platform: current_platform,
-            version: manifest.java.version,
+            version: manifest.java.version_descriptor(context).await?,
             java_directory
         };
 
@@ -127,17 +102,13 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     // MINECRAFT
 
     let minecraft_directory = path.join("minecraft");
-    let minecraft_descriptor_prefix = manifest
-        .minecraft
-        .loader
+    let minecraft_version = manifest.minecraft.resolved_version(context).await?;
+    let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
+    let minecraft_descriptor_prefix = minecraft_loader
         .as_ref()
         .map(|l| l.to_string())
         .unwrap_or(String::from("minecraft"));
-
-    let minecraft_descriptor = format!(
-        "{}-{}",
-        minecraft_descriptor_prefix, manifest.minecraft.version
-    );
+    let minecraft_descriptor = format!("{}-{}", minecraft_descriptor_prefix, minecraft_version);
 
     let minecraft_path = minecraft_directory
         .join(minecraft_descriptor)
@@ -145,8 +116,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     if !minecraft_path.exists() {
         let minecraft_install_options = MinecraftInstallOptions {
-            version: manifest.minecraft.version.clone(),
-            loader: manifest.minecraft.loader.clone(),
+            version: minecraft_version.clone(),
+            loader: minecraft_loader.clone(),
             minecraft_directory
         };
 
@@ -157,11 +128,21 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     // PROPERTIES
 
+    let mut properties = ServerProperties::default();
+
+    properties.apply(&manifest);
+
+    tokio::fs::write(
+        instance_path.join("server.properties"),
+        properties.to_string()?
+    )
+    .await?;
+
     // MODS
 
     let sync_options = SyncModsOptions {
-        game_version: manifest.minecraft.version.clone(),
-        loader: manifest.minecraft.loader,
+        game_version: minecraft_version.clone(),
+        loader: minecraft_loader.clone(),
         lockfile_path: options.lockfile_path.clone(),
         mods_path: instance_path.join("mods")
     };

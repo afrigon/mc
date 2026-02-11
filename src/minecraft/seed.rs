@@ -1,4 +1,3 @@
-use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -7,10 +6,4 @@ use serde::Serialize;
 pub enum MinecraftSeed {
     Numeric(i64),
     Text(String)
-}
-
-impl MinecraftSeed {
-    pub fn random() -> MinecraftSeed {
-        MinecraftSeed::Numeric(rand::rng().random::<i64>())
-    }
 }

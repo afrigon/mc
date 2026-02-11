@@ -48,10 +48,10 @@ pub struct MinecraftInstallCommand {
 impl CommandHandler for MinecraftInstallCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let version =
-            MinecraftVersionResolver::resolve(context, Some(self.version.clone())).await?;
+            MinecraftVersionResolver::resolve(context, Some(self.version.as_str())).await?;
 
-        let loader = match self.loader.clone() {
-            Some(l) => LoaderVersionResolver::resolve_descriptor(context, l)
+        let loader = match self.loader {
+            Some(ref l) => LoaderVersionResolver::resolve_descriptor(context, l)
                 .await
                 .ok(),
             None => None
@@ -123,7 +123,7 @@ pub struct MinecraftListLoadersCommand {
 impl CommandHandler for MinecraftListLoadersCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let minecraft_version =
-            MinecraftVersionResolver::resolve(context, Some(self.minecraft_version.clone()))
+            MinecraftVersionResolver::resolve(context, Some(self.minecraft_version.as_str()))
                 .await?;
 
         let options = MinecraftListLoadersOptions {

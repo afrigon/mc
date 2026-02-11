@@ -35,7 +35,8 @@ pub struct ModrinthApiDependency {
 #[serde(rename_all = "lowercase")]
 pub enum ModrinthApiDependencyKind {
     Required,
-    Incompatible
+    Incompatible,
+    Optional
 }
 
 #[derive(Deserialize)]
@@ -76,7 +77,7 @@ pub async fn get_version(client: &reqwest::Client, id: &String) -> McResult<Modr
 pub async fn get_latest_version(
     client: &reqwest::Client,
     project: &String,
-    loader: &LoaderKind,
+    loader: LoaderKind,
     game_version: &String
 ) -> McResult<ModrinthApiVersion> {
     let url = Url::parse(&format!(

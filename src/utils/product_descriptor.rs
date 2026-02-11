@@ -84,15 +84,15 @@ where
     P::Err: Into<anyhow::Error>,
     V::Err: Into<anyhow::Error>
 {
-    async fn resolve(context: &McContext, version: Option<String>) -> McResult<V>;
+    async fn resolve(context: &McContext, version: Option<&str>) -> McResult<V>;
 
     async fn resolve_descriptor(
         context: &McContext,
-        descriptor: RawProductDescriptor
+        descriptor: &RawProductDescriptor
     ) -> McResult<ProductDescriptor<P, V>> {
         Ok(ProductDescriptor {
             product: descriptor.product.parse().map_err(Into::into)?,
-            version: Self::resolve(context, descriptor.version).await?
+            version: Self::resolve(context, descriptor.version.as_deref()).await?
         })
     }
 }

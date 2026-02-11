@@ -50,7 +50,6 @@ pub struct MinecraftApiVersionMetadata {
 
 #[derive(Deserialize)]
 pub struct MinecraftApiVersionMetadataDownloads {
-    pub client: MinecraftApiArtifactMetadata,
     pub server: MinecraftApiArtifactMetadata
 }
 

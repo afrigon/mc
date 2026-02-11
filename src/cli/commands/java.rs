@@ -47,8 +47,7 @@ pub struct JavaInstallCommand {
 
 impl CommandHandler for JavaInstallCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
-        let version =
-            JavaVersionResolver::resolve_descriptor(context, self.version.clone()).await?;
+        let version = JavaVersionResolver::resolve_descriptor(context, &self.version).await?;
         let platform = self.platform.unwrap_or_else(|| Platform::current());
         let architecture = self.architecture.unwrap_or_else(|| Architecture::current());
         let java_directory = context.cwd.join("java"); // TODO: fix this path

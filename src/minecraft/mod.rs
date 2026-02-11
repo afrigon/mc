@@ -1,10 +1,12 @@
+use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
 
+pub mod eula;
 pub mod seed;
 pub mod server_properties;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum MinecraftDifficulty {
     Peaceful,
@@ -13,7 +15,13 @@ pub enum MinecraftDifficulty {
     Hard
 }
 
-#[derive(Serialize)]
+impl Default for MinecraftDifficulty {
+    fn default() -> Self {
+        MinecraftDifficulty::Normal
+    }
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum MinecraftGamemode {
     Survival,
@@ -22,7 +30,13 @@ pub enum MinecraftGamemode {
     Spectator
 }
 
-#[derive(Serialize)]
+impl Default for MinecraftGamemode {
+    fn default() -> Self {
+        MinecraftGamemode::Survival
+    }
+}
+
+#[derive(Serialize, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum MinecraftRegionCompression {
     deflate,
@@ -63,7 +77,7 @@ impl Serialize for MinecraftPermission {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize, Copy, Clone)]
 pub enum MinecraftLevelKind {
     #[serde(rename = "minecraft:normal")]
     Normal,

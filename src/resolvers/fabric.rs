@@ -7,8 +7,8 @@ use crate::utils::product_descriptor::VersionResolver;
 pub struct FabricVersionResolver;
 
 impl VersionResolver<LoaderKind> for FabricVersionResolver {
-    async fn resolve(context: &McContext, version: Option<String>) -> McResult<String> {
-        let version = version.unwrap_or_else(|| "latest".to_owned());
+    async fn resolve(context: &McContext, version: Option<&str>) -> McResult<String> {
+        let version = version.unwrap_or("latest");
 
         let versions = services::fabric_api::get_versions(&context.http_client).await?;
 
@@ -16,7 +16,7 @@ impl VersionResolver<LoaderKind> for FabricVersionResolver {
             anyhow::bail!("failed to fetch fabric versions")
         }
 
-        match version.as_str() {
+        match version {
             "latest" => {
                 if let Some(first) = versions.first() {
                     Ok(first.version.to_owned())

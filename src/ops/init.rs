@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::context::McContext;
+use crate::manifest;
+use crate::manifest::presets::ManifestPreset;
 use crate::utils;
 use crate::utils::errors::McResult;
 
@@ -24,30 +26,11 @@ pub async fn init_directories(
     Ok(())
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum InitPreset {
-    Vanilla,
-    Optimized,
-    Technical
-}
-
-impl FromStr for InitPreset {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "vanilla" | "default" => InitPreset::Vanilla,
-            "tech" | "technical" => InitPreset::Technical,
-            _ => InitPreset::Optimized
-        })
-    }
-}
-
 pub struct InitOptions {
     pub path: PathBuf,
     pub name: Option<String>,
     pub eula: bool,
-    pub preset: InitPreset
+    pub preset: ManifestPreset
 }
 
 fn get_name<'a>(path: &'a Path, options: &'a InitOptions) -> McResult<&'a str> {
@@ -89,33 +72,11 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
     if !options.eula {
         context
             .shell()
-            .warn("the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`")?;
+            .warn("the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in the server section of `mc.toml`")?;
     }
 
-    let mut manifest = toml_edit::DocumentMut::new();
-
-    // TODO: clean this up and handle preset
-    manifest["name"] = toml_edit::value(name);
-
-    let server_table = manifest["server"]
-        .or_insert(toml_edit::Item::Table(toml_edit::Table::new()))
-        .as_table_mut()
-        .ok_or_else(|| utils::errors::internal("failed to unwrap the server toml table"))?;
-
-    server_table["gamemode"] = toml_edit::value("survival");
-    server_table["difficulty"] = toml_edit::value("normal");
-    server_table["hardcore"] = toml_edit::value(false);
-    server_table["eula"] = toml_edit::value(options.eula);
-    server_table
-        .key_mut("eula")
-        .ok_or_else(|| utils::errors::internal("failed to unwrap the eula toml key"))?
-        .leaf_decor_mut()
-        .set_prefix("\n# Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).\n# This agreement is between you and Mojang/Microsoft.\n");
-
-    manifest["backups"] = toml_edit::Item::Table(toml_edit::Table::new());
-    manifest["backups"]["enabled"] = toml_edit::value(true);
-
-    manifest["mods"] = toml_edit::Item::Table(toml_edit::Table::new());
+    let manifest =
+        manifest::presets::create_document(context, options.preset, name, options.eula).await?;
 
     tokio::fs::write(toml_path, manifest.to_string()).await?;
 
