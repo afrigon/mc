@@ -153,7 +153,9 @@ impl Default for ServerProperties {
             resource_pack_id: None,
             resource_pack_prompt: None,
             resource_pack_sha1: None,
-            server_ip: None,
+            // Bind the IPv6 wildcard so the server is reachable over IPv6; on a
+            // dual-stack host this also accepts IPv4-mapped connections.
+            server_ip: Some(String::from("::")),
             server_port: 25565,
             simulation_distance: 16,
             spawn_protection: 0,
@@ -193,7 +195,12 @@ impl ServerProperties {
         self.enable_rcon = manifest.backups.enabled;
         self.rcon_port = manifest.server.rcon_port;
         self.server_port = manifest.server.port;
-        self.server_ip = manifest.server.ip.clone();
+
+        // Only override the default bind address when the manifest sets one, so
+        // the IPv6 wildcard default is preserved otherwise.
+        if manifest.server.ip.is_some() {
+            self.server_ip = manifest.server.ip.clone();
+        }
         self.gamemode = manifest.server.gamemode;
         self.difficulty = manifest.server.difficulty;
         self.hardcore = manifest.server.hardcore;
