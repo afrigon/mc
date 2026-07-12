@@ -52,7 +52,7 @@ pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> M
 
 pub struct JavaListOptions {}
 
-pub async fn list(context: &mut McContext, options: &JavaListOptions) -> McResult<()> {
+pub async fn list(context: &mut McContext, _options: &JavaListOptions) -> McResult<()> {
     for descriptor in JavaDescriptor::all_cases() {
         let mut shell = context.shell();
         let stdout = shell.out();

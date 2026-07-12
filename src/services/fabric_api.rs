@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::Deserialize;

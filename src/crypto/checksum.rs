@@ -44,6 +44,7 @@ pub struct RemoteChecksum {
 }
 
 impl RemoteChecksum {
+    #[allow(dead_code)]
     pub fn md5(url: Url) -> RemoteChecksum {
         RemoteChecksum {
             url,
@@ -51,6 +52,7 @@ impl RemoteChecksum {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sha1(url: Url) -> RemoteChecksum {
         RemoteChecksum {
             url,

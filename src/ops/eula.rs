@@ -9,7 +9,7 @@ pub struct EulaApplyOptions {
     pub instance_path: PathBuf
 }
 
-pub async fn apply(context: &mut McContext, options: &EulaApplyOptions) -> McResult<()> {
+pub async fn apply(_context: &mut McContext, options: &EulaApplyOptions) -> McResult<()> {
     let eula_path = options.instance_path.join("eula.txt");
     let eula = MinecraftEula {
         eula: options.accept

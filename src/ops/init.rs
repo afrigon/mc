@@ -1,7 +1,5 @@
-use std::convert::Infallible;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use crate::context::McContext;
 use crate::manifest;
@@ -14,7 +12,7 @@ pub struct InitDirectoriesOptions {
 }
 
 pub async fn init_directories(
-    context: &mut McContext,
+    _context: &mut McContext,
     options: &InitDirectoriesOptions
 ) -> McResult<()> {
     tokio::try_join!(

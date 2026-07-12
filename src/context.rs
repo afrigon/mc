@@ -4,7 +4,6 @@ use std::sync::Mutex;
 use std::sync::MutexGuard;
 
 use anyhow::Context;
-use aws_config::BehaviorVersion;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
 use reqwest::header::USER_AGENT;

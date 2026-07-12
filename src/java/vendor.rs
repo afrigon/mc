@@ -3,7 +3,6 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 
-use crate::java::JavaVersion;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq, Deserialize)]

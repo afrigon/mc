@@ -37,13 +37,14 @@ impl Default for MinecraftGamemode {
 }
 
 #[derive(Serialize, Copy, Clone)]
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, dead_code)]
 pub enum MinecraftRegionCompression {
     deflate,
     lz4
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[allow(dead_code)]
 #[repr(u8)]
 pub enum MinecraftPermission {
     /// No permission.
