@@ -1,8 +1,13 @@
+use std::env;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::time::Duration;
 
 use anyhow::Context;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
+use tokio_cron_scheduler::Job;
+use tokio_cron_scheduler::JobScheduler;
 
 use crate::context::McContext;
 use crate::env::Architecture;
@@ -10,12 +15,19 @@ use crate::env::Platform;
 use crate::manifest::Manifest;
 use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
+use crate::ops::backups::BackupOptions;
 use crate::ops::eula::EulaApplyOptions;
 use crate::ops::init::InitDirectoriesOptions;
 use crate::ops::java::JavaInstallOptions;
+use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
 use crate::utils::errors::McResult;
+
+/// How long to wait for the server to save and exit after asking it to stop
+/// before forcing it down. Kept under systemd's default 90s `TimeoutStopSec` so
+/// our grace window runs before systemd SIGKILLs the unit.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(85);
 
 pub struct RunOptions {
     pub manifest_path: PathBuf,
@@ -42,14 +54,37 @@ fn sanitize_command(command: &Command) -> String {
         .join(" ")
 }
 
+/// Resolves when a shutdown signal arrives: Ctrl-C everywhere, plus SIGTERM on
+/// Unix so `systemctl stop` triggers a graceful shutdown.
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::SignalKind;
+        use tokio::signal::unix::signal;
+
+        let mut interrupt =
+            signal(SignalKind::interrupt()).expect("failed to register the SIGINT handler");
+        let mut terminate =
+            signal(SignalKind::terminate()).expect("failed to register the SIGTERM handler");
+
+        tokio::select! {
+            _ = interrupt.recv() => {}
+            _ = terminate.recv() => {}
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
+}
+
 // TODO: validate error context for all cases.
 // - invalid versions
 // - invalid toml format
 // - missing toml file
 // - etc.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> {
-    // TODO: make sure the server is running only once?
-
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
         .context("could not find mc.toml file")?;
@@ -60,6 +95,14 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     let init_directories_options = InitDirectoriesOptions { path: path.clone() };
     ops::init::init_directories(context, &init_directories_options).await?;
+
+    // Take exclusive ownership of the world for as long as this server runs, so a
+    // second `mc run` or a restore cannot touch it underneath us.
+    let locks = InstanceLocks::new(&path);
+    let mut world_lock = locks.world()?;
+    let world_guard = world_lock
+        .try_acquire()?
+        .context("this instance is already running; only one server can run per directory")?;
 
     // EULA
 
@@ -124,13 +167,26 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         ops::minecraft::install(context, &minecraft_install_options).await?;
     }
 
-    // TODO: fetch capabilities
+    // TODO: fetch the configured version's capabilities (see `capabilities.rs`)
+    // and fail fast when backups are enabled on a version too old to support RCON
+    // (Capability::RemoteConsole) — without it the world cannot be flushed before
+    // a backup.
 
     // PROPERTIES
 
     let mut properties = ServerProperties::default();
 
     properties.apply(&manifest);
+
+    // Backups flush the world over rcon, so an enabled instance needs a password.
+    // Honor an explicit one from the environment, otherwise generate a strong
+    // one so backups work out of the box (enabling rcon without a password would
+    // expose an unauthenticated console).
+    properties.rcon_password = match env::var("MC_RCON_PASSWORD").ok() {
+        Some(password) => Some(password),
+        None if manifest.backups.enabled => Some(uuid::Uuid::new_v4().simple().to_string()),
+        None => None
+    };
 
     tokio::fs::write(
         instance_path.join("server.properties"),
@@ -154,11 +210,12 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     let mut command = tokio::process::Command::new(java_bin_path);
 
     command
+        .args(manifest.java.args())
         .arg("-jar")
         .arg(minecraft_path.as_os_str())
         .arg("--nogui")
         .current_dir(&instance_path)
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(true);
@@ -170,19 +227,86 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     let mut child = command.spawn()?;
 
+    // BACKUPS
+
+    let mut scheduler = JobScheduler::new().await?;
+
+    if manifest.backups.enabled {
+        let world_path = instance_path.join(&manifest.name);
+        let project_path = path.clone();
+        let rcon_password = properties.rcon_password.clone();
+        let storage = manifest.backups.effective_storage();
+        let notifier = manifest.backups.notifier(context.http_client.clone());
+
+        let backup_job = Job::new_async(manifest.backups.frequency, move |_, _| {
+            let project_path = project_path.clone();
+            let world_path = world_path.clone();
+            let storage = storage.clone();
+            let rcon_password = rcon_password.clone();
+            let notifier = notifier.clone();
+
+            Box::pin(async move {
+                let backup_options = BackupOptions {
+                    project_path,
+                    world_path,
+                    storage,
+                    rcon_port: manifest.server.rcon_port,
+                    rcon_password,
+                    notifier
+                };
+
+                match ops::backups::backup(&backup_options).await {
+                    Ok(_) => tracing::info!("world backup complete"),
+                    Err(error) => tracing::error!("backup failed: {:?}", error)
+                }
+            })
+        })?;
+
+        scheduler.add(backup_job).await?;
+    }
+
+    scheduler.start().await?;
+
+    let mut stdin = child
+        .stdin
+        .take()
+        .context("could not attach to minecraft process")?;
+
     tokio::select! {
         _ = child.wait() => {
-
+            // the server exited on its own
         }
-        _ = tokio::signal::ctrl_c() => {
-            // TODO: rcon save + stop instead of kill
-            // TODO: release the lock
+        _ = shutdown_signal() => {
+            _ = context
+                .shell()
+                .status("Stopping", "asking the server to save and shut down");
 
-            child.kill().await?
+            stdin.write_all(b"stop\n").await?;
+            stdin.flush().await?;
+
+            // Wait for the server to flush and exit. Force it down if it hangs
+            // past the grace period or a second signal arrives.
+            tokio::select! {
+                _ = child.wait() => {}
+                _ = tokio::time::sleep(SHUTDOWN_GRACE) => {
+                    _ = context
+                        .shell()
+                        .warn("the server did not stop in time, forcing it down");
+                    let _ = child.kill().await;
+                }
+                _ = shutdown_signal() => {
+                    _ = context
+                        .shell()
+                        .warn("received a second signal, forcing the server down");
+                    let _ = child.kill().await;
+                }
+            }
         }
     };
 
-    // TODO: live backups
+    scheduler.shutdown().await?;
+
+    drop(world_guard);
 
     Ok(())
 }

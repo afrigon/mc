@@ -32,7 +32,7 @@ use crate::utils::verbosity::Verbosity;
 
 #[tokio::main]
 async fn main() {
-    let mut context = match McContext::default() {
+    let mut context = match McContext::default().await {
         Ok(context) => context,
         Err(e) => {
             let mut shell = Shell::new();
@@ -83,7 +83,9 @@ async fn run(cli: &Cli, context: &mut McContext) -> CliResult {
             JavaSubcommand::List(command) => command.handle(context).await
         },
         CliCommand::Add(command) => command.handle(context).await,
-        CliCommand::Remove(command) => command.handle(context).await
+        CliCommand::Remove(command) => command.handle(context).await,
+        CliCommand::Backup(command) => command.handle(context).await,
+        CliCommand::Restore(command) => command.handle(context).await
     }
 }
 

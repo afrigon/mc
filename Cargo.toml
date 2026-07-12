@@ -10,11 +10,14 @@ anstyle = "1.0.13"
 anyhow = "1.0.100"
 astral-tokio-tar = { version = "0.5.6", default-features = false }
 async-compression = { version = "0.4.37", features = ["gzip", "tokio"] }
+aws-config = "1.8.14"
+aws-sdk-s3 = "1.123.0"
 chrono = "0.4.43"
 chrono-tz = "0.10.4"
 clap = { version = "4.5.54", features = ["derive"] }
 digest = "0.10.7"
 directories = "6.0.0"
+fd-lock = "4.0.4"
 futures-util = "0.3.31"
 hex = { version = "0.4.3", features = ["serde"] }
 iana-time-zone = "0.1.65"
@@ -30,11 +33,14 @@ sha2 = "0.10.9"
 tempfile = "3.24.0"
 thiserror = "2.0.18"
 tokio = { version = "1.49.0", features = ["full"] } # change this to only required features
+tokio-cron-scheduler = "0.15.1"
 tokio-util = "0.7.18"
 toml = "0.9.11"
 toml_edit = "0.24.0"
 tracing = "0.1.44"
 unicode-ident = "1.0.22"
 url = { version = "2.5.8", features = ["serde"] }
+uuid = { version = "1.23.2", features = ["v4"] }
+walkdir = "2.5.0"
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Console", "Win32_Storage_FileSystem"] }
 zip = "7.2.0"

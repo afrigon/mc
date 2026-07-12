@@ -1,7 +1,9 @@
+pub mod archive;
 mod case_iterable;
 pub mod csv;
 pub mod date;
 pub mod errors;
+pub mod lock;
 pub mod product_descriptor;
 pub mod restricted_names;
 pub mod shell;

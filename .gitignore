@@ -6,6 +6,9 @@
 /instance
 /mc.toml
 
+/mc.world.lock
+/mc.backup.lock
+
 /temp
 
 .todo

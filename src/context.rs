@@ -4,6 +4,7 @@ use std::sync::Mutex;
 use std::sync::MutexGuard;
 
 use anyhow::Context;
+use aws_config::BehaviorVersion;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
 use reqwest::header::USER_AGENT;
@@ -18,7 +19,7 @@ pub struct McContext {
 }
 
 impl McContext {
-    pub fn new(shell: Shell, cwd: PathBuf) -> McResult<McContext> {
+    pub async fn new(shell: Shell, cwd: PathBuf) -> McResult<McContext> {
         let mut headers = HeaderMap::new();
         let user_agent = format!(
             "afrigon/{}/{}",
@@ -39,12 +40,12 @@ impl McContext {
         })
     }
 
-    pub fn default() -> McResult<McContext> {
+    pub async fn default() -> McResult<McContext> {
         let shell = Shell::new();
 
         let cwd = env::current_dir().context("could not get the current working directory")?;
 
-        Ok(McContext::new(shell, cwd)?)
+        Ok(McContext::new(shell, cwd).await?)
     }
 
     pub fn shell(&self) -> MutexGuard<'_, Shell> {

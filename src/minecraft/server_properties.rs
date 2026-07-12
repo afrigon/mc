@@ -1,9 +1,10 @@
+use std::io::ErrorKind;
+use std::path::Path;
+
 use anyhow::Context;
 use serde::Serialize;
-use tracing::field::debug;
 use url::Url;
 
-use crate::exit_with_error;
 use crate::manifest::Manifest;
 use crate::minecraft::MinecraftDifficulty;
 use crate::minecraft::MinecraftGamemode;
@@ -18,79 +19,79 @@ use crate::utils::errors::McResult;
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerProperties {
-    accepts_transfers: bool,
-    allow_flight: bool,
-    broadcast_console_to_ops: bool,
-    broadcast_rcon_to_ops: bool,
-    bug_report_link: Option<Url>,
-    difficulty: MinecraftDifficulty,
-    enable_code_of_conduct: bool,
-    enable_jmx_monitoring: bool,
-    enable_query: bool,
-    enable_rcon: bool,
-    enable_status: bool,
-    enforce_secure_profile: bool,
-    enforce_whitelist: bool,
-    entity_broadcast_range_percentage: usize,
-    force_gamemode: bool,
-    function_permission_level: MinecraftPermission,
-    gamemode: MinecraftGamemode,
-    generate_structures: bool,
-    generator_settings: String,
-    hardcore: bool,
-    hide_online_players: bool,
-    initial_disabled_packs: SeparatedList<String, ','>,
-    initial_enabled_packs: SeparatedList<String, ','>,
-    level_name: String,
-    level_seed: Option<MinecraftSeed>,
-    level_type: MinecraftLevelKind,
-    log_ips: bool,
-    management_server_allowed_origins: SeparatedList<String, ','>,
-    management_server_enabled: bool,
-    management_server_host: String,
-    management_server_port: u16,
-    management_server_secret: Option<String>,
-    management_server_tls_enabled: bool,
-    management_server_tls_keystore: Option<String>,
-    management_server_tls_keystore_password: Option<String>,
-    max_chained_neighbor_updates: usize,
-    max_players: i32,
-    max_tick_time: usize,
-    max_world_size: usize,
-    motd: String,
-    network_compression_threshold: usize,
-    online_mode: bool,
-    op_permission_level: MinecraftPermission,
-    pause_when_empty_seconds: usize,
-    player_idle_timeout: usize,
-    prevent_proxy_connections: bool,
+    pub accepts_transfers: bool,
+    pub allow_flight: bool,
+    pub broadcast_console_to_ops: bool,
+    pub broadcast_rcon_to_ops: bool,
+    pub bug_report_link: Option<Url>,
+    pub difficulty: MinecraftDifficulty,
+    pub enable_code_of_conduct: bool,
+    pub enable_jmx_monitoring: bool,
+    pub enable_query: bool,
+    pub enable_rcon: bool,
+    pub enable_status: bool,
+    pub enforce_secure_profile: bool,
+    pub enforce_whitelist: bool,
+    pub entity_broadcast_range_percentage: usize,
+    pub force_gamemode: bool,
+    pub function_permission_level: MinecraftPermission,
+    pub gamemode: MinecraftGamemode,
+    pub generate_structures: bool,
+    pub generator_settings: String,
+    pub hardcore: bool,
+    pub hide_online_players: bool,
+    pub initial_disabled_packs: SeparatedList<String, ','>,
+    pub initial_enabled_packs: SeparatedList<String, ','>,
+    pub level_name: String,
+    pub level_seed: Option<MinecraftSeed>,
+    pub level_type: MinecraftLevelKind,
+    pub log_ips: bool,
+    pub management_server_allowed_origins: SeparatedList<String, ','>,
+    pub management_server_enabled: bool,
+    pub management_server_host: String,
+    pub management_server_port: u16,
+    pub management_server_secret: Option<String>,
+    pub management_server_tls_enabled: bool,
+    pub management_server_tls_keystore: Option<String>,
+    pub management_server_tls_keystore_password: Option<String>,
+    pub max_chained_neighbor_updates: usize,
+    pub max_players: i32,
+    pub max_tick_time: usize,
+    pub max_world_size: usize,
+    pub motd: String,
+    pub network_compression_threshold: usize,
+    pub online_mode: bool,
+    pub op_permission_level: MinecraftPermission,
+    pub pause_when_empty_seconds: usize,
+    pub player_idle_timeout: usize,
+    pub prevent_proxy_connections: bool,
 
     #[serde(rename = "query.port")]
-    query_port: u16,
+    pub query_port: u16,
 
-    rate_limit: usize,
+    pub rate_limit: usize,
 
     #[serde(rename = "rcon.password")]
-    rcon_password: Option<String>,
+    pub rcon_password: Option<String>,
 
     #[serde(rename = "rcon.port")]
-    rcon_port: u16,
+    pub rcon_port: u16,
 
-    region_file_compression: Option<MinecraftRegionCompression>,
-    require_resource_pack: bool,
-    resource_pack: Option<String>,
-    resource_pack_id: Option<String>,
-    resource_pack_prompt: Option<String>,
-    resource_pack_sha1: Option<String>,
-    server_ip: Option<String>,
-    server_port: u16,
-    simulation_distance: u8,
-    spawn_protection: usize,
-    status_heartbeat_interval: usize,
-    sync_chunk_writes: bool,
-    use_native_transport: bool,
-    view_distance: u8,
-    white_list: bool
+    pub region_file_compression: Option<MinecraftRegionCompression>,
+    pub require_resource_pack: bool,
+    pub resource_pack: Option<String>,
+    pub resource_pack_id: Option<String>,
+    pub resource_pack_prompt: Option<String>,
+    pub resource_pack_sha1: Option<String>,
+    pub server_ip: Option<String>,
+    pub server_port: u16,
+    pub simulation_distance: u8,
+    pub spawn_protection: usize,
+    pub status_heartbeat_interval: usize,
+    pub sync_chunk_writes: bool,
+    pub use_native_transport: bool,
+    pub view_distance: u8,
+    pub white_list: bool
 }
 
 impl Default for ServerProperties {
@@ -166,6 +167,26 @@ impl Default for ServerProperties {
 }
 
 impl ServerProperties {
+    /// Reads the configured rcon password from an instance's `server.properties`,
+    /// the source of truth for the running server's credentials. Returns `None`
+    /// if the file or the key is absent.
+    pub async fn read_rcon_password(instance_path: &Path) -> McResult<Option<String>> {
+        let path = instance_path.join("server.properties");
+
+        let content = match tokio::fs::read_to_string(&path).await {
+            Ok(content) => content,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error).context("could not read server.properties")
+        };
+
+        let password = content
+            .lines()
+            .find_map(|line| line.strip_prefix("rcon.password="))
+            .map(str::to_string);
+
+        Ok(password)
+    }
+
     pub fn apply(&mut self, manifest: &Manifest) {
         self.level_name = manifest.name.clone();
         self.motd = manifest.description.clone();

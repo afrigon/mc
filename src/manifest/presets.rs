@@ -112,6 +112,7 @@ fn create_document_base(name: &str, eula: bool, game_version: &String) -> Docume
     // [backups]
     document["backups"] = Item::Table(Table::new());
     document["backups"]["enabled"] = value(true);
+    document["backups"]["frequency"] = value("0 0 * * * *");
 
     // [mods]
     document["mods"] = toml_edit::Item::Table(toml_edit::Table::new());

@@ -1,4 +1,3 @@
-pub mod archive;
 pub mod artifact;
 
 use std::io;
@@ -14,10 +13,10 @@ use tracing::debug;
 use crate::crypto::checksum::ChecksumAlgorithm;
 use crate::crypto::checksum::LocalChecksum;
 use crate::crypto::hash::Hasher;
-use crate::network::archive::deflate_tar_gz;
-use crate::network::archive::deflate_zip;
 use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
+use crate::utils::archive::deflate_tar_gz;
+use crate::utils::archive::deflate_zip;
 use crate::utils::errors::McResult;
 
 pub async fn stream_artifact(
@@ -63,7 +62,7 @@ pub async fn stream_artifact(
     Ok(())
 }
 
-pub async fn save_file<R: AsyncRead + Unpin>(
+async fn save_file<R: AsyncRead + Unpin>(
     mut reader: Hasher<R>,
     checksum: Option<LocalChecksum>,
     output: &Path
