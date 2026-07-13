@@ -29,11 +29,13 @@ pub trait BackupBackend {
 
     /// Download `filename` and extract it into `output`. `output` must not
     /// already exist; the caller is responsible for clearing it first.
+    /// `staging` is a scratch directory on the same filesystem as `output`.
     async fn restore(
         &self,
         context: &mut McContext,
         filename: &str,
-        output: &Path
+        output: &Path,
+        staging: &Path
     ) -> McResult<()>;
 }
 
@@ -89,11 +91,12 @@ impl BackupBackend for Backend {
         &self,
         context: &mut McContext,
         filename: &str,
-        output: &Path
+        output: &Path,
+        staging: &Path
     ) -> McResult<()> {
         match self {
-            Backend::S3(backend) => backend.restore(context, filename, output).await,
-            Backend::Local(backend) => backend.restore(context, filename, output).await
+            Backend::S3(backend) => backend.restore(context, filename, output, staging).await,
+            Backend::Local(backend) => backend.restore(context, filename, output, staging).await
         }
     }
 }
@@ -264,8 +267,12 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
         )?)
     };
 
+    let staging = options.project_path.join("temp");
+    tokio::fs::create_dir_all(&staging).await?;
+
     let exclude = HashSet::from([PathBuf::from("session.lock")]);
-    let archive = utils::archive::inflate_tar_gz(options.world_path.clone(), &exclude).await?;
+    let archive =
+        utils::archive::inflate_tar_gz(options.world_path.clone(), &exclude, &staging).await?;
 
     if let Some(rcon) = &mut rcon {
         rcon.send_command("save-on".to_string())
@@ -287,8 +294,38 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
 
     backend.backup(&filename, archive).await?;
 
+    let _ = tokio::fs::remove_dir(&staging).await;
+
     // Keep backups serialized until the upload finishes.
     drop(backup_guard);
+
+    Ok(())
+}
+
+pub struct ListOptions {
+    pub storage: BackupStorage
+}
+
+pub async fn list(context: &mut McContext, options: &ListOptions) -> McResult<()> {
+    let backend = Backend::from_storage(&options.storage)?;
+    let backups = backend.list().await?;
+
+    if backups.is_empty() {
+        _ = context.shell().warn("no backups were found");
+
+        return Ok(());
+    }
+
+    let mut shell = context.shell();
+    let stdout = shell.out();
+
+    for (i, backup) in backups.iter().enumerate() {
+        if i == 0 {
+            writeln!(stdout, "{} (latest)", backup)?;
+        } else {
+            writeln!(stdout, "{}", backup)?;
+        }
+    }
 
     Ok(())
 }
@@ -360,7 +397,13 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
         None
     };
 
-    let result = match backend.restore(context, &filename, &options.world_path).await {
+    let staging = options.project_path.join("temp");
+    tokio::fs::create_dir_all(&staging).await?;
+
+    let result = match backend
+        .restore(context, &filename, &options.world_path, &staging)
+        .await
+    {
         Ok(()) => {
             _ = context.shell().status("Finished", "world restored");
 
@@ -372,14 +415,18 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
             if let Some(aside) = aside {
                 let _ = tokio::fs::remove_dir_all(&options.world_path).await;
 
-                tokio::fs::rename(&aside, &options.world_path).await.context(
-                    "the restore failed and the original world could not be rolled back"
-                )?;
+                tokio::fs::rename(&aside, &options.world_path)
+                    .await
+                    .context(
+                        "the restore failed and the original world could not be rolled back"
+                    )?;
             }
 
             Err(error).context("failed to restore the backup; the original world was kept")
         }
     };
+
+    let _ = tokio::fs::remove_dir(&staging).await;
 
     drop(backup_guard);
     drop(world_guard);

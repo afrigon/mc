@@ -12,7 +12,8 @@ use crate::utils::product_descriptor::ProductDescriptor;
 pub struct MinecraftInstallOptions {
     pub version: String,
     pub loader: Option<ProductDescriptor<LoaderKind>>,
-    pub minecraft_directory: PathBuf
+    pub minecraft_directory: PathBuf,
+    pub staging_directory: PathBuf
 }
 
 pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions) -> McResult<()> {
@@ -53,7 +54,13 @@ pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions)
         services::minecraft_api::artifact_source(&context.http_client, &options.version).await?
     };
 
-    network::stream_artifact(&context.http_client, source, &path).await
+    network::stream_artifact(
+        &context.http_client,
+        source,
+        &path,
+        &options.staging_directory
+    )
+    .await
 }
 
 pub struct MinecraftListOptions {

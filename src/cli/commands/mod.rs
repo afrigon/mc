@@ -6,6 +6,7 @@ pub mod minecraft;
 pub mod remove;
 pub mod restore;
 pub mod run;
+pub mod update;
 
 use clap::Subcommand;
 
@@ -17,6 +18,7 @@ use crate::cli::commands::minecraft::MinecraftCommand;
 use crate::cli::commands::remove::RemoveCommand;
 use crate::cli::commands::restore::RestoreCommand;
 use crate::cli::commands::run::RunCommand;
+use crate::cli::commands::update::UpdateCommand;
 
 #[derive(Subcommand)]
 pub enum CliCommand {
@@ -35,6 +37,9 @@ pub enum CliCommand {
 
     /// Remove mods from a manifest file
     Remove(RemoveCommand),
+
+    /// Update all mods to their latest version for the configured Minecraft version
+    Update(UpdateCommand),
 
     /// Start a backup of the world files
     Backup(BackupCommand),

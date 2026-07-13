@@ -43,6 +43,12 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
     // TODO: add more options (ex: --url)
 
     if let Some(loader) = minecraft_loader {
+        // Pre-create `[mods]` as a standard table: writing through indexing
+        // alone would create the key as an inline `mods = { ... }` value.
+        manifest_document
+            .entry("mods")
+            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
+
         for m in &options.mods {
             let version = services::modrinth_api::get_latest_version(
                 &context.http_client,
@@ -110,11 +116,85 @@ pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McR
     Ok(())
 }
 
+pub struct UpdateModsOptions {
+    pub manifest_path: PathBuf
+}
+
+pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McResult<()> {
+    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
+        .await
+        .context("could not find mc.toml file")?;
+    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
+    let mut manifest_document = manifest_string.parse::<toml_edit::DocumentMut>()?;
+
+    let minecraft_version = manifest.minecraft.resolved_version(context).await?;
+    let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
+
+    if let Some(loader) = minecraft_loader {
+        let mut names: Vec<&String> = manifest.mods.keys().collect();
+        names.sort();
+
+        for name in names {
+            let current = match &manifest.mods[name] {
+                ManifestMod::Version(version) => version.clone(),
+                ManifestMod::Detailed { version, .. } => version.clone(),
+                ManifestMod::Remote { .. } => {
+                    _ = context
+                        .shell()
+                        .status("Skipping", format!("{} (url mods are not versioned)", name));
+
+                    continue;
+                }
+            };
+
+            let latest = services::modrinth_api::get_latest_version(
+                &context.http_client,
+                name,
+                loader.product,
+                &minecraft_version
+            )
+            .await
+            .context(format!(
+                "the mod `{}` could not be found on modrinth for the configured versions and loader",
+                name
+            ))?;
+
+            if latest.id == current {
+                _ = context
+                    .shell()
+                    .status("Skipping", format!("{} (already the latest version)", name));
+
+                continue;
+            }
+
+            match &manifest.mods[name] {
+                ManifestMod::Detailed { .. } => {
+                    manifest_document["mods"][name]["version"] = toml_edit::value(&latest.id);
+                }
+                _ => {
+                    manifest_document["mods"][name] = toml_edit::value(&latest.id);
+                }
+            }
+
+            _ = context
+                .shell()
+                .status("Updating", format!("{} {} -> {}", name, current, latest.id));
+        }
+
+        tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
+    } else {
+        anyhow::bail!("a loader must be configured in mc.toml before updating mods");
+    }
+
+    Ok(())
+}
+
 pub struct SyncModsOptions {
     pub game_version: String,
     pub loader: Option<ProductDescriptor<LoaderKind>>,
     pub mods_path: PathBuf,
-    pub lockfile_path: PathBuf
+    pub lockfile_path: PathBuf,
+    pub staging_path: PathBuf
 }
 
 pub async fn sync(
@@ -203,7 +283,13 @@ pub async fn sync(
                             checksum: Some(ChecksumRef::Local(LocalChecksum::sha1(checksum)))
                         };
 
-                        network::stream_artifact(&context.http_client, source, &output).await?;
+                        network::stream_artifact(
+                            &context.http_client,
+                            source,
+                            &output,
+                            &options.staging_path
+                        )
+                        .await?;
 
                         // TODO: hash into lockfile
                     }
@@ -214,7 +300,13 @@ pub async fn sync(
                             checksum: None
                         };
 
-                        network::stream_artifact(&context.http_client, source, &output).await?;
+                        network::stream_artifact(
+                            &context.http_client,
+                            source,
+                            &output,
+                            &options.staging_path
+                        )
+                        .await?;
 
                         // TODO: hash into lockfile
                     }

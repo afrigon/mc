@@ -15,8 +15,12 @@ use crate::crypto::checksum::LocalChecksum;
 use crate::crypto::hash::Hasher;
 use crate::utils::errors::McResult;
 
-pub async fn inflate_tar_gz(src: PathBuf, exclude: &HashSet<PathBuf>) -> McResult<NamedTempFile> {
-    let temp = tempfile::NamedTempFile::new()?;
+pub async fn inflate_tar_gz(
+    src: PathBuf,
+    exclude: &HashSet<PathBuf>,
+    staging: &Path
+) -> McResult<NamedTempFile> {
+    let temp = tempfile::NamedTempFile::new_in(staging)?;
 
     let file = temp.as_file().try_clone()?;
     let async_file = tokio::fs::File::from_std(file);
@@ -65,15 +69,16 @@ pub async fn inflate_tar_gz(src: PathBuf, exclude: &HashSet<PathBuf>) -> McResul
 pub async fn deflate_tar_gz<R: AsyncRead + Unpin>(
     mut reader: Hasher<R>,
     checksum: Option<LocalChecksum>,
-    output: &Path
+    output: &Path,
+    staging: &Path
 ) -> McResult<()> {
-    let dir = tempfile::tempdir()?;
+    let dir = tempfile::tempdir_in(staging)?;
 
     let buf = tokio::io::BufReader::with_capacity(256 * 1024, &mut reader);
     let gz = GzipDecoder::new(buf);
     let mut tar = ArchiveBuilder::new(gz)
         .set_allow_external_symlinks(false)
-        .set_preserve_permissions(false)
+        .set_preserve_permissions(true)
         .set_preserve_mtime(false)
         .set_unpack_xattrs(false)
         .set_overwrite(false)
@@ -114,9 +119,10 @@ pub async fn deflate_tar_gz<R: AsyncRead + Unpin>(
 pub async fn deflate_zip<R: AsyncRead + Unpin>(
     mut reader: Hasher<R>,
     checksum: Option<LocalChecksum>,
-    output: &Path
+    output: &Path,
+    staging: &Path
 ) -> McResult<()> {
-    let dir = tempfile::tempdir()?;
+    let dir = tempfile::tempdir_in(staging)?;
     let archive_path = dir.path().join("archive.zip.partial");
     let async_file = tokio::fs::File::create(&archive_path).await?;
 
@@ -132,9 +138,12 @@ pub async fn deflate_zip<R: AsyncRead + Unpin>(
     }
 
     let file = fs::File::open(&archive_path)?;
+    let extracted = dir.path().join("extracted");
 
     let mut archive = zip::ZipArchive::new(file)?;
-    archive.extract_unwrapped_root_dir(output, zip::read::root_dir_common_filter)?;
+    archive.extract_unwrapped_root_dir(&extracted, zip::read::root_dir_common_filter)?;
+
+    tokio::fs::rename(extracted, output).await?;
 
     Ok(())
 }

@@ -84,6 +84,7 @@ async fn run(cli: &Cli, context: &mut McContext) -> CliResult {
         },
         CliCommand::Add(command) => command.handle(context).await,
         CliCommand::Remove(command) => command.handle(context).await,
+        CliCommand::Update(command) => command.handle(context).await,
         CliCommand::Backup(command) => command.handle(context).await,
         CliCommand::Restore(command) => command.handle(context).await
     }

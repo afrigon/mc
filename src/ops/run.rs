@@ -1,5 +1,7 @@
 use std::env;
+use std::io::ErrorKind;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -84,7 +86,9 @@ async fn shutdown_signal() {
 // - invalid toml format
 // - missing toml file
 // - etc.
-pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> {
+/// Returns the server's exit status when it exits on its own; `None` when the
+/// shutdown was requested by a signal.
+pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Option<ExitStatus>> {
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
         .context("could not find mc.toml file")?;
@@ -92,6 +96,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     let path = context.cwd.clone();
     let instance_path = path.join("instance");
+    let staging_path = path.join("temp");
 
     let init_directories_options = InitDirectoriesOptions { path: path.clone() };
     ops::init::init_directories(context, &init_directories_options).await?;
@@ -103,6 +108,13 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
     let world_guard = world_lock
         .try_acquire()?
         .context("this instance is already running; only one server can run per directory")?;
+
+    // Interrupted runs leave partial downloads behind; holding the world lock
+    // guarantees nothing else is staging in there, so clear it out.
+    match tokio::fs::remove_dir_all(&staging_path).await {
+        Err(error) if error.kind() != ErrorKind::NotFound => return Err(error.into()),
+        _ => {}
+    }
 
     // EULA
 
@@ -130,7 +142,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
             architecture: Architecture::current(),
             platform: current_platform,
             version: manifest.java.version_descriptor(context).await?,
-            java_directory
+            java_directory,
+            staging_directory: staging_path.clone()
         };
 
         ops::java::install(context, &java_install_options).await?;
@@ -161,7 +174,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         let minecraft_install_options = MinecraftInstallOptions {
             version: minecraft_version.clone(),
             loader: minecraft_loader.clone(),
-            minecraft_directory
+            minecraft_directory,
+            staging_directory: staging_path.clone()
         };
 
         ops::minecraft::install(context, &minecraft_install_options).await?;
@@ -200,7 +214,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         game_version: minecraft_version.clone(),
         loader: minecraft_loader.clone(),
         lockfile_path: options.lockfile_path.clone(),
-        mods_path: instance_path.join("mods")
+        mods_path: instance_path.join("mods"),
+        staging_path: staging_path.clone()
     };
 
     ops::mods::sync(context, &sync_options, &manifest.mods).await?;
@@ -216,8 +231,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         .arg("--nogui")
         .current_dir(&instance_path)
         .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     let command_string = sanitize_command(&command);
@@ -272,9 +287,12 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
         .take()
         .context("could not attach to minecraft process")?;
 
+    let mut exit_status = None;
+
     tokio::select! {
-        _ = child.wait() => {
+        status = child.wait() => {
             // the server exited on its own
+            exit_status = Some(status?);
         }
         _ = shutdown_signal() => {
             _ = context
@@ -308,5 +326,5 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<()> 
 
     drop(world_guard);
 
-    Ok(())
+    Ok(exit_status)
 }

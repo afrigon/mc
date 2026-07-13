@@ -38,11 +38,12 @@ impl BackupBackend for S3BackupBackend {
         &self,
         context: &mut McContext,
         filename: &str,
-        output: &Path
+        output: &Path,
+        staging: &Path
     ) -> McResult<()> {
         let source = services::s3_api::artifact_source(&self.bucket, filename, None).await?;
 
-        network::stream_artifact(&context.http_client, source, output).await?;
+        network::stream_artifact(&context.http_client, source, output, staging).await?;
 
         Ok(())
     }

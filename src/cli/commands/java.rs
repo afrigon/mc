@@ -56,7 +56,8 @@ impl CommandHandler for JavaInstallCommand {
             version,
             platform,
             architecture,
-            java_directory
+            java_directory,
+            staging_directory: context.cwd.join("temp")
         };
 
         ops::java::install(context, &options).await?;

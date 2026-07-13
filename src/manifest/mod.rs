@@ -93,11 +93,15 @@ impl Default for ManifestJava {
         ManifestJava {
             version: RawProductDescriptor {
                 product: String::from("graal"),
-                version: Some(String::from("21"))
+                version: Some(String::from("25"))
             },
-            min_memory: 512,
+            min_memory: 4096,
             max_memory: 4096,
-            jvm_arguments: Vec::default()
+            jvm_arguments: vec![
+                String::from("-Djava.net.preferIPv6Addresses=true"),
+                String::from("-XX:+AlwaysPreTouch"),
+                String::from("-Djdk.graal.TuneInlinerExploration=1")
+            ]
         }
     }
 }

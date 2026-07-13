@@ -62,7 +62,8 @@ impl CommandHandler for MinecraftInstallCommand {
         let options = MinecraftInstallOptions {
             version,
             loader,
-            minecraft_directory
+            minecraft_directory,
+            staging_directory: context.cwd.join("temp")
         };
 
         ops::minecraft::install(context, &options).await?;

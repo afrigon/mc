@@ -22,9 +22,12 @@ use crate::utils::errors::McResult;
 pub async fn stream_artifact(
     client: &reqwest::Client,
     source: ArtifactSource,
-    output: &Path
+    output: &Path,
+    staging: &Path
 ) -> McResult<()> {
     debug!("downloading from: {}", source.url);
+
+    tokio::fs::create_dir_all(staging).await?;
 
     let checksum = source
         .checksum(client)
@@ -47,27 +50,25 @@ pub async fn stream_artifact(
             .unwrap_or(ChecksumAlgorithm::md5)
     );
 
-    match source.kind {
-        ArtifactKind::Zip => {
-            deflate_zip(hasher, checksum, output).await?;
-        }
-        ArtifactKind::TarGz => {
-            deflate_tar_gz(hasher, checksum, output).await?;
-        }
-        _ => {
-            save_file(hasher, checksum, output).await?;
-        }
+    let result = match source.kind {
+        ArtifactKind::Zip => deflate_zip(hasher, checksum, output, staging).await,
+        ArtifactKind::TarGz => deflate_tar_gz(hasher, checksum, output, staging).await,
+        _ => save_file(hasher, checksum, output, staging).await
     };
 
-    Ok(())
+    // Empty-only removal: never deletes anything another operation is staging.
+    let _ = tokio::fs::remove_dir(staging).await;
+
+    result
 }
 
 async fn save_file<R: AsyncRead + Unpin>(
     mut reader: Hasher<R>,
     checksum: Option<LocalChecksum>,
-    output: &Path
+    output: &Path,
+    staging: &Path
 ) -> McResult<()> {
-    let dir = tempfile::tempdir()?;
+    let dir = tempfile::tempdir_in(staging)?;
     let file_path = dir.path().join("file.partial");
     let async_file = tokio::fs::File::create(&file_path).await?;
 

@@ -38,7 +38,13 @@ impl BackupBackend for LocalBackupBackend {
     async fn backup(&self, filename: &str, archive: NamedTempFile) -> McResult<()> {
         tokio::fs::create_dir_all(&self.directory).await?;
 
-        _ = archive.persist(self.directory.join(filename))?;
+        let target = self.directory.join(filename);
+
+        // `persist` is a rename, which fails when the backup directory is on a
+        // different filesystem than the staging area; copy instead in that case.
+        if let Err(error) = archive.persist(&target) {
+            tokio::fs::copy(error.file.path(), &target).await?;
+        }
 
         self.prune().await?;
 
@@ -74,7 +80,8 @@ impl BackupBackend for LocalBackupBackend {
         &self,
         _context: &mut McContext,
         filename: &str,
-        output: &Path
+        output: &Path,
+        staging: &Path
     ) -> McResult<()> {
         let path = self.directory.join(filename);
 
@@ -84,7 +91,7 @@ impl BackupBackend for LocalBackupBackend {
 
         let reader = Hasher::new(file, ChecksumAlgorithm::md5);
 
-        deflate_tar_gz(reader, None, output).await?;
+        deflate_tar_gz(reader, None, output, staging).await?;
 
         Ok(())
     }

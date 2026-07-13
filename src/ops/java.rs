@@ -17,7 +17,8 @@ pub struct JavaInstallOptions {
     pub version: JavaDescriptor,
     pub platform: Platform,
     pub architecture: Architecture,
-    pub java_directory: PathBuf
+    pub java_directory: PathBuf,
+    pub staging_directory: PathBuf
 }
 
 pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> McResult<()> {
@@ -32,7 +33,9 @@ pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> M
 
     _ = context.shell().status("Installing", name);
 
-    tokio::fs::create_dir_all(&path).await?;
+    // Create only the parent: the final rename out of staging is what creates
+    // `path`, so its existence proves a completed install.
+    tokio::fs::create_dir_all(&options.java_directory).await?;
 
     let source = match options.version.product {
         JavaVendor::correto => corretto_api::CorrettoApi::jdk_source(
@@ -47,7 +50,13 @@ pub async fn install(context: &mut McContext, options: &JavaInstallOptions) -> M
         )
     };
 
-    network::stream_artifact(&context.http_client, source, &path).await
+    network::stream_artifact(
+        &context.http_client,
+        source,
+        &path,
+        &options.staging_directory
+    )
+    .await
 }
 
 pub struct JavaListOptions {}

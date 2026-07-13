@@ -7,6 +7,7 @@ use crate::cli::CommandHandler;
 use crate::context::McContext;
 use crate::manifest::Manifest;
 use crate::ops;
+use crate::ops::backups::ListOptions;
 use crate::ops::backups::RestoreOptions;
 use crate::utils::errors::CliResult;
 
@@ -23,7 +24,11 @@ pub struct RestoreCommand {
 
     /// Filename of the backup to restore (defaults to the most recent backup)
     #[arg(long, value_name = "BACKUP")]
-    pub backup: Option<String>
+    pub backup: Option<String>,
+
+    /// List the available backups instead of restoring
+    #[arg(long, conflicts_with = "backup")]
+    pub list: bool
 }
 
 impl CommandHandler for RestoreCommand {
@@ -34,8 +39,14 @@ impl CommandHandler for RestoreCommand {
         let manifest = toml::from_str::<Manifest>(&manifest_string)
             .map_err(|_| anyhow::anyhow!("could not parse manifest file"))?;
 
-        if !manifest.backups.enabled {
-            return Err(anyhow::anyhow!("backups are disabled for this instance").into());
+        if self.list {
+            let options = ListOptions {
+                storage: manifest.backups.effective_storage()
+            };
+
+            ops::backups::list(context, &options).await?;
+
+            return Ok(());
         }
 
         // TODO: create a backup before restoring, if not empty
