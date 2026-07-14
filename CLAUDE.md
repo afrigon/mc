@@ -20,8 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Everything operates relative to `context.cwd`. These are gitignored and created at runtime:
 - `mc.toml` — the manifest (user-authored)
-- `java/<descriptor>/` — installed JDKs
-- `minecraft/<loader-version>/server.jar` — installed server jars
+- `.java/<descriptor>/` — installed JDKs
+- `.minecraft/<loader-version>/server.jar` — installed server jars
 - `instance/` — the live server working directory (world, `server.properties`, `eula.txt`)
 - `temp/` — scratch space for downloads/archives
 
@@ -47,4 +47,11 @@ Request flow: `main.rs` builds `McContext`, parses `Cli` (clap), then dispatches
 - **Errors.** `McResult<T>` = `anyhow::Result<T>` is used everywhere internally; add context with `.context(...)`. At the CLI boundary, errors become `CliError` (carries an exit code; default 101). Wrap a "this should never happen" error with `utils::errors::internal(...)` / `InternalError` — `exit_with_error` detects it and prints the bug-report footer.
 - **Traits to extend behavior.** New API client → add to `services/`. New version source → implement `VersionResolver`. New backup destination → implement `BackupBackend` (`ops/backups/`, currently `local` + `s3`). New JDK distribution → implement `JavaProvider`.
 - **Backups** coordinate with the running server over RCON (`save-off` → `save-all flush` → archive → `save-on`), then hand the archive to a `BackupBackend` (`local` or `s3`). Backend dispatch uses enum matching rather than `Box<dyn>` because the trait's `async fn` methods make it `dyn`-incompatible.
+- **Output channels.** User-facing messages go through `Shell` (via `McContext::shell()` or a cloned `shell_handle()` in `'static` closures); `tracing` is reserved for `debug!`/`trace!` diagnostics.
 - **Formatting** is enforced by `rustfmt.toml`: `imports_granularity = "Item"` (one `use` per item) and `group_imports = "StdExternalCrate"`. Match the existing one-import-per-line style.
+
+## Panic safety
+
+- Never run code that can panic: no `unwrap`, `expect`, indexing without bounds checks, or similar.
+- Always handle errors safely and propagate them with `?`/`.context(...)`.
+- Always unwrap `Option`/`Result` through safe combinators or pattern matching (e.g. recover a poisoned lock with `unwrap_or_else(PoisonError::into_inner)`).

@@ -3,6 +3,7 @@ use serde::Serialize;
 use serde::Serializer;
 
 pub mod eula;
+pub mod log4j;
 pub mod seed;
 pub mod server_properties;
 

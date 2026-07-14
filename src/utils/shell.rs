@@ -49,6 +49,10 @@ impl Shell {
         self.verbosity = verbosity
     }
 
+    pub fn verbosity(&self) -> Verbosity {
+        self.verbosity
+    }
+
     pub fn set_color_choice(&mut self, color_choice: clap::ColorChoice) {
         self.color_choice = match color_choice {
             clap::ColorChoice::Auto => ColorChoice::Auto,

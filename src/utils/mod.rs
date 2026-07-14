@@ -4,6 +4,7 @@ pub mod csv;
 pub mod date;
 pub mod errors;
 pub mod lock;
+pub mod process;
 pub mod product_descriptor;
 pub mod restricted_names;
 pub mod shell;

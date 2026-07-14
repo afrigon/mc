@@ -5,6 +5,9 @@ use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::PoisonError;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -17,6 +20,7 @@ use crate::ops::lock::InstanceLocks;
 use crate::services;
 use crate::utils;
 use crate::utils::errors::McResult;
+use crate::utils::shell::Shell;
 
 pub trait BackupBackend {
     /// Store `archive` under `filename`.
@@ -147,6 +151,7 @@ impl NotificationKind {
 #[derive(Clone)]
 pub struct BackupNotifier {
     client: reqwest::Client,
+    shell: Arc<Mutex<Shell>>,
     kind: NotificationKind,
     webhook: String,
     on_success: bool,
@@ -156,6 +161,7 @@ pub struct BackupNotifier {
 impl BackupNotifier {
     pub fn new(
         client: reqwest::Client,
+        shell: Arc<Mutex<Shell>>,
         kind: NotificationKind,
         webhook: String,
         on_success: bool,
@@ -163,6 +169,7 @@ impl BackupNotifier {
     ) -> BackupNotifier {
         BackupNotifier {
             client,
+            shell,
             kind,
             webhook,
             on_success,
@@ -187,7 +194,11 @@ impl BackupNotifier {
 
         // A failed notification must never fail the backup itself.
         if let Err(error) = sent {
-            tracing::warn!("could not send backup notification: {:?}", error);
+            _ = self
+                .shell
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .warn(format!("could not send backup notification: {:?}", error));
         }
     }
 }

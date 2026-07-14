@@ -47,7 +47,7 @@ impl CommandHandler for BackupCommand {
             storage: manifest.backups.effective_storage(),
             world_path: instance_path.join(&manifest.name),
             project_path: context.cwd.clone(),
-            notifier: manifest.backups.notifier(context.http_client.clone())
+            notifier: manifest.backups.notifier(context)
         };
 
         ops::backups::backup(&options).await?;

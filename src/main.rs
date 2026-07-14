@@ -58,6 +58,24 @@ async fn main() {
             _ => Verbosity::VeryVerbose
         }
     };
+
+    let log_level = if quiet {
+        tracing::Level::ERROR
+    } else {
+        match verbose {
+            0 => tracing::Level::WARN,
+            1 => tracing::Level::INFO,
+            2 => tracing::Level::DEBUG,
+            _ => tracing::Level::TRACE
+        }
+    };
+
+    tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .with_writer(std::io::stderr)
+        .init();
+
+    context.log_level = log_level;
     context.shell().set_verbosity(verbosity);
 
     let color_choice = cli.globals.color;

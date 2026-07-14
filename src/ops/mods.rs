@@ -26,8 +26,7 @@ use crate::utils::product_descriptor::RawProductDescriptor;
 
 pub struct AddModsOptions {
     pub mods: Vec<String>,
-    pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf
+    pub manifest_path: PathBuf
 }
 
 pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<()> {
@@ -73,15 +72,12 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
 
     tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
 
-    // TODO: should I sync here? or maybe manually edit the lockfile?
-
     Ok(())
 }
 
 pub struct RemoveModsOptions {
     pub mods: Vec<String>,
-    pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf
+    pub manifest_path: PathBuf
 }
 
 pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McResult<()> {
@@ -110,8 +106,6 @@ pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McR
     }
 
     tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
-
-    // TODO: should I sync here? or maybe manually edit the lockfile?
 
     Ok(())
 }

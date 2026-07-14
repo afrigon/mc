@@ -97,5 +97,4 @@ where
     }
 }
 
-// TODO: implement Display
 // TODO: investigate a way to reuse the resolver request

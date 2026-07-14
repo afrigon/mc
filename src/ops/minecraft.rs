@@ -38,7 +38,6 @@ pub async fn install(context: &mut McContext, options: &MinecraftInstallOptions)
 
     tokio::fs::create_dir_all(&directory).await?;
 
-    // TODO: use different api based on loader
     let source = if let Some(ref loader) = options.loader {
         match loader.product {
             LoaderKind::Fabric => {

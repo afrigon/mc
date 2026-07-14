@@ -3,6 +3,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
+use std::sync::PoisonError;
 use std::time::Duration;
 
 use anyhow::Context;
@@ -15,6 +16,7 @@ use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
+use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
 use crate::ops::backups::BackupOptions;
@@ -24,6 +26,7 @@ use crate::ops::java::JavaInstallOptions;
 use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
+use crate::utils;
 use crate::utils::errors::McResult;
 
 /// How long to wait for the server to save and exit after asking it to stop
@@ -34,6 +37,14 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(85);
 pub struct RunOptions {
     pub manifest_path: PathBuf,
     pub lockfile_path: PathBuf
+}
+
+fn has_jvm_property(arguments: &[String], property: &str) -> bool {
+    let prefix = format!("-D{}=", property);
+
+    arguments
+        .iter()
+        .any(|argument| argument.starts_with(&prefix))
 }
 
 fn sanitize_command(command: &Command) -> String {
@@ -133,7 +144,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     // JAVA
 
-    let java_directory = path.join("java");
+    let java_directory = path.join(".java");
     let java_path = java_directory.join(manifest.java.version.to_string());
     let current_platform = Platform::current();
 
@@ -157,7 +168,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     // MINECRAFT
 
-    let minecraft_directory = path.join("minecraft");
+    let minecraft_directory = path.join(".minecraft");
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
     let minecraft_descriptor_prefix = minecraft_loader
@@ -224,8 +235,35 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let mut command = tokio::process::Command::new(java_bin_path);
 
+    let server_log_level = match context.log_level {
+        tracing::Level::ERROR => "error",
+        tracing::Level::WARN => "warn",
+        tracing::Level::INFO => "info",
+        tracing::Level::DEBUG => "debug",
+        tracing::Level::TRACE => "trace"
+    };
+
+    command.args(manifest.java.args());
+
+    // Keep the server's console log level in sync with mc's verbosity, unless
+    // the manifest configures the corresponding property itself.
+    if !has_jvm_property(&manifest.java.jvm_arguments, "log4j.configurationFile") {
+        tokio::fs::write(
+            instance_path.join("log4j2.xml"),
+            log4j::configuration(server_log_level)
+        )
+        .await?;
+
+        command.arg("-Dlog4j.configurationFile=log4j2.xml");
+    }
+
+    if minecraft_loader.is_some()
+        && !has_jvm_property(&manifest.java.jvm_arguments, "fabric.log.level")
+    {
+        command.arg(format!("-Dfabric.log.level={}", server_log_level));
+    }
+
     command
-        .args(manifest.java.args())
         .arg("-jar")
         .arg(minecraft_path.as_os_str())
         .arg("--nogui")
@@ -234,6 +272,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
+
+    utils::process::detach_from_terminal_signals(&mut command);
 
     let command_string = sanitize_command(&command);
     _ = context
@@ -251,7 +291,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         let project_path = path.clone();
         let rcon_password = properties.rcon_password.clone();
         let storage = manifest.backups.effective_storage();
-        let notifier = manifest.backups.notifier(context.http_client.clone());
+        let notifier = manifest.backups.notifier(context);
+        let shell = context.shell_handle();
 
         let backup_job = Job::new_async(manifest.backups.frequency, move |_, _| {
             let project_path = project_path.clone();
@@ -259,6 +300,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             let storage = storage.clone();
             let rcon_password = rcon_password.clone();
             let notifier = notifier.clone();
+            let shell = shell.clone();
 
             Box::pin(async move {
                 let backup_options = BackupOptions {
@@ -270,9 +312,12 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     notifier
                 };
 
-                match ops::backups::backup(&backup_options).await {
-                    Ok(_) => tracing::info!("world backup complete"),
-                    Err(error) => tracing::error!("backup failed: {:?}", error)
+                let result = ops::backups::backup(&backup_options).await;
+                let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+                match result {
+                    Ok(_) => _ = shell.status("Finished", "world backup complete"),
+                    Err(error) => _ = shell.error(format!("backup failed: {:?}", error))
                 }
             })
         })?;
@@ -305,18 +350,38 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             // Wait for the server to flush and exit. Force it down if it hangs
             // past the grace period or a second signal arrives.
             tokio::select! {
-                _ = child.wait() => {}
+                status = child.wait() => {
+                    match status {
+                        Ok(status) if status.success() => {
+                            _ = context
+                                .shell()
+                                .status("Stopped", "the server saved the world and exited cleanly");
+                        }
+                        Ok(status) => {
+                            _ = context
+                                .shell()
+                                .warn(format!("the server exited with {} while stopping", status));
+                        }
+                        Err(error) => {
+                            _ = context
+                                .shell()
+                                .warn(format!("could not observe the server exit: {}", error));
+                        }
+                    }
+                }
                 _ = tokio::time::sleep(SHUTDOWN_GRACE) => {
                     _ = context
                         .shell()
                         .warn("the server did not stop in time, forcing it down");
                     let _ = child.kill().await;
+                    _ = context.shell().status("Stopped", "the server was forced down");
                 }
                 _ = shutdown_signal() => {
                     _ = context
                         .shell()
                         .warn("received a second signal, forcing the server down");
                     let _ = child.kill().await;
+                    _ = context.shell().status("Stopped", "the server was forced down");
                 }
             }
         }

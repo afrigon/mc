@@ -1,7 +1,9 @@
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
+use std::sync::PoisonError;
 
 use anyhow::Context;
 use reqwest::header::HeaderMap;
@@ -12,9 +14,10 @@ use crate::utils::errors::McResult;
 use crate::utils::shell::Shell;
 
 pub struct McContext {
-    shell: Mutex<Shell>,
+    shell: Arc<Mutex<Shell>>,
     pub cwd: PathBuf,
-    pub http_client: reqwest::Client
+    pub http_client: reqwest::Client,
+    pub log_level: tracing::Level
 }
 
 impl McContext {
@@ -33,9 +36,10 @@ impl McContext {
             .build()?;
 
         Ok(McContext {
-            shell: Mutex::new(shell),
+            shell: Arc::new(Mutex::new(shell)),
             cwd,
-            http_client
+            http_client,
+            log_level: tracing::Level::WARN
         })
     }
 
@@ -48,6 +52,10 @@ impl McContext {
     }
 
     pub fn shell(&self) -> MutexGuard<'_, Shell> {
-        self.shell.lock().unwrap()
+        self.shell.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn shell_handle(&self) -> Arc<Mutex<Shell>> {
+        self.shell.clone()
     }
 }

@@ -16,8 +16,8 @@ pub async fn init_directories(
     options: &InitDirectoriesOptions
 ) -> McResult<()> {
     tokio::try_join!(
-        tokio::fs::create_dir_all(options.path.join("minecraft")),
-        tokio::fs::create_dir_all(options.path.join("java")),
+        tokio::fs::create_dir_all(options.path.join(".minecraft")),
+        tokio::fs::create_dir_all(options.path.join(".java")),
         tokio::fs::create_dir_all(options.path.join("instance"))
     )?;
 

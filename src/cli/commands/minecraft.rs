@@ -57,7 +57,7 @@ impl CommandHandler for MinecraftInstallCommand {
             None => None
         };
 
-        let minecraft_directory = context.cwd.join("minecraft"); // TODO: fix this path, use data path by default, also review other paths for cwd != project dir
+        let minecraft_directory = context.cwd.join(".minecraft");
 
         let options = MinecraftInstallOptions {
             version,

@@ -100,7 +100,7 @@ impl Default for ManifestJava {
             jvm_arguments: vec![
                 String::from("-Djava.net.preferIPv6Addresses=true"),
                 String::from("-XX:+AlwaysPreTouch"),
-                String::from("-Djdk.graal.TuneInlinerExploration=1")
+                String::from("-Djdk.graal.TuneInlinerExploration=1"),
             ]
         }
     }
@@ -195,22 +195,24 @@ impl ManifestBackups {
 
     /// Builds a notifier from the configured provider and its webhook secret.
     /// Returns `None` when notifications are not configured, or when the provider
-    /// is set but its webhook is missing from the environment (an error is logged
-    /// in that case, since the secret is intentionally never read from `mc.toml`).
-    pub fn notifier(&self, client: reqwest::Client) -> Option<BackupNotifier> {
+    /// is set but its webhook is missing from the environment (a warning is
+    /// printed in that case, since the secret is intentionally never read from
+    /// `mc.toml`).
+    pub fn notifier(&self, context: &McContext) -> Option<BackupNotifier> {
         let kind = self.notifications.kind?;
 
         let Some(webhook) = kind.webhook_from_env() else {
-            tracing::error!(
+            _ = context.shell().warn(format!(
                 "backup notifications are enabled but the {} environment variable is not set; no notifications will be sent",
                 kind.webhook_env_var()
-            );
+            ));
 
             return None;
         };
 
         Some(BackupNotifier::new(
-            client,
+            context.http_client.clone(),
+            context.shell_handle(),
             kind,
             webhook,
             self.notifications.on_success,
