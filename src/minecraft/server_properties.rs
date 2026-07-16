@@ -16,6 +16,12 @@ use crate::utils;
 use crate::utils::csv::SeparatedList;
 use crate::utils::errors::McResult;
 
+// Mirrors the vanilla server.properties keys and defaults as of Minecraft Java
+// Edition 26.3, per https://minecraft.wiki/w/Server.properties. To sync with a
+// later Minecraft version: read that page's History section for every key
+// added, removed, or defaulted differently after 26.3, mirror each change in
+// both the struct fields (alphabetical by serialized kebab-case name) and the
+// `Default` impl below, then bump the version in this comment.
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerProperties {
@@ -24,6 +30,8 @@ pub struct ServerProperties {
     pub broadcast_console_to_ops: bool,
     pub broadcast_rcon_to_ops: bool,
     pub bug_report_link: Option<Url>,
+    pub chat_spam_threshold_seconds: usize,
+    pub command_spam_threshold_seconds: usize,
     pub difficulty: MinecraftDifficulty,
     pub enable_code_of_conduct: bool,
     pub enable_jmx_monitoring: bool,
@@ -102,6 +110,8 @@ impl Default for ServerProperties {
             broadcast_console_to_ops: true,
             broadcast_rcon_to_ops: true,
             bug_report_link: None,
+            chat_spam_threshold_seconds: 10,
+            command_spam_threshold_seconds: 10,
             difficulty: MinecraftDifficulty::Normal,
             enable_code_of_conduct: false,
             enable_jmx_monitoring: false,
@@ -163,7 +173,7 @@ impl Default for ServerProperties {
             sync_chunk_writes: true,
             use_native_transport: true,
             view_distance: 16,
-            white_list: false
+            white_list: true
         }
     }
 }

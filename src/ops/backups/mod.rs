@@ -395,11 +395,14 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
 
     // Move the current world aside rather than deleting it so a failed restore
     // can be rolled back, and so the extraction target does not already exist.
+    // The name is static, so each restore replaces the aside left by the
+    // previous one and at most one is kept around.
     let aside = if tokio::fs::try_exists(&options.world_path).await? {
-        let date_string = utils::date::filename_date_string();
-        let aside = options
-            .world_path
-            .with_extension(format!("bak_{}", date_string));
+        let aside = options.world_path.with_extension("restore.bak");
+
+        if tokio::fs::try_exists(&aside).await? {
+            tokio::fs::remove_dir_all(&aside).await?;
+        }
 
         tokio::fs::rename(&options.world_path, &aside).await?;
 
