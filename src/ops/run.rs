@@ -278,8 +278,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     // Backups flush the world over rcon, so an enabled instance needs a password.
     // The environment password rides the managed layer; the generated fallback
-    // sits in the base layer so a `rcon.password` override can replace it
-    // (enabling rcon without a password would expose an unauthenticated console).
+    // sits in the base layer so a `rcon.password` override can replace it.
     let environment_rcon_password = env::var("MC_RCON_PASSWORD").ok();
 
     properties.rcon_password = match &environment_rcon_password {
@@ -301,7 +300,21 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         }
     }
 
-    let property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
+    if property_overrides.contains_key("enable-rcon") {
+        _ = context.shell().warn(
+            "the `enable-rcon` entry under [server.properties] was ignored; rcon is enabled when a rcon password is configured"
+        );
+    }
+
+    let mut property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
+
+    // rcon without a password would expose an unauthenticated console, so the
+    // switch is derived from the effective password instead of set directly.
+    let rcon_enabled = property_entries
+        .get("rcon.password")
+        .is_some_and(|password| !password.is_empty());
+
+    property_entries.insert(String::from("enable-rcon"), rcon_enabled.to_string());
 
     let contains_secrets = SECRET_PROPERTY_KEYS.iter().any(|key| {
         property_entries
