@@ -2,12 +2,8 @@ pub mod local;
 pub mod s3;
 
 use std::collections::HashSet;
-use std::env;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::PoisonError;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -17,10 +13,9 @@ use crate::context::McContext;
 use crate::ops::backups::local::LocalBackupBackend;
 use crate::ops::backups::s3::S3BackupBackend;
 use crate::ops::lock::InstanceLocks;
-use crate::services;
+use crate::ops::notifications::Notifier;
 use crate::utils;
 use crate::utils::errors::McResult;
-use crate::utils::shell::Shell;
 
 pub trait BackupBackend {
     /// Store `archive` under `filename`.
@@ -126,90 +121,13 @@ pub enum BackupStorage {
     }
 }
 
-/// The notification provider. Only Discord is implemented for now.
-#[derive(Deserialize, Clone, Copy, Default, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum NotificationKind {
-    #[default]
-    Discord
-}
-
-impl NotificationKind {
-    pub fn webhook_env_var(&self) -> &'static str {
-        match self {
-            NotificationKind::Discord => "MC_BACKUPS_DISCORD_WEBHOOK"
-        }
-    }
-
-    pub fn webhook_from_env(&self) -> Option<String> {
-        env::var(self.webhook_env_var())
-            .ok()
-            .filter(|webhook| !webhook.is_empty())
-    }
-}
-
-#[derive(Clone)]
-pub struct BackupNotifier {
-    client: reqwest::Client,
-    shell: Arc<Mutex<Shell>>,
-    kind: NotificationKind,
-    webhook: String,
-    on_success: bool,
-    on_failure: bool
-}
-
-impl BackupNotifier {
-    pub fn new(
-        client: reqwest::Client,
-        shell: Arc<Mutex<Shell>>,
-        kind: NotificationKind,
-        webhook: String,
-        on_success: bool,
-        on_failure: bool
-    ) -> BackupNotifier {
-        BackupNotifier {
-            client,
-            shell,
-            kind,
-            webhook,
-            on_success,
-            on_failure
-        }
-    }
-
-    async fn notify(&self, world_name: &str, result: &McResult<()>) {
-        let message = match result {
-            Ok(()) if self.on_success => format!("✅ backup of `{}` completed", world_name),
-            Err(error) if self.on_failure => {
-                format!("❌ backup of `{}` failed: {}", world_name, error)
-            }
-            _ => return
-        };
-
-        let sent = match self.kind {
-            NotificationKind::Discord => {
-                services::discord_api::notify(&self.client, &self.webhook, &message).await
-            }
-        };
-
-        // A failed notification must never fail the backup itself.
-        if let Err(error) = sent {
-            _ = self
-                .shell
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .warn(format!("could not send backup notification: {:?}", error));
-        }
-    }
-}
-
 pub struct BackupOptions {
     pub project_path: PathBuf,
     pub world_path: PathBuf,
     pub storage: BackupStorage,
     pub rcon_port: u16,
     pub rcon_password: Option<String>,
-    pub notifier: Option<BackupNotifier>
+    pub notifier: Option<Notifier>
 }
 
 // TODO: improve scheduler code so that we can take in McContext here.
@@ -223,7 +141,7 @@ pub async fn backup(options: &BackupOptions) -> McResult<()> {
             .and_then(|name| name.to_str())
             .unwrap_or("world");
 
-        notifier.notify(world_name, &result).await;
+        notifier.notify_backup(world_name, &result).await;
     }
 
     result

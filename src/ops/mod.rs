@@ -5,4 +5,5 @@ pub mod java;
 pub mod lock;
 pub mod minecraft;
 pub mod mods;
+pub mod notifications;
 pub mod run;

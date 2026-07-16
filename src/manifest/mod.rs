@@ -18,9 +18,11 @@ use crate::minecraft::MinecraftLevelKind;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::mods::loader::LoaderKind;
 use crate::mods::service::ModServiceKind;
-use crate::ops::backups::BackupNotifier;
 use crate::ops::backups::BackupStorage;
-use crate::ops::backups::NotificationKind;
+use crate::ops::notifications::NotificationKind;
+use crate::ops::notifications::NotificationTarget;
+use crate::ops::notifications::Notifier;
+use crate::ops::notifications::NotifierConfiguration;
 use crate::resolvers::java::JavaVersionResolver;
 use crate::resolvers::loader::LoaderVersionResolver;
 use crate::resolvers::minecraft::MinecraftVersionResolver;
@@ -47,7 +49,10 @@ pub struct Manifest {
     pub mods: HashMap<String, ManifestMod>,
 
     #[serde(default)]
-    pub backups: ManifestBackups
+    pub backups: ManifestBackups,
+
+    #[serde(default)]
+    pub notifications: ManifestNotifications
 }
 
 #[derive(Deserialize)]
@@ -131,6 +136,58 @@ impl ManifestMinecraft {
             ))
         } else {
             Ok(None)
+        }
+    }
+}
+
+impl Manifest {
+    /// Providers are enabled by their webhook environment variable alone; the
+    /// secret is intentionally never read from `mc.toml`.
+    pub fn notifier(&self, context: &McContext) -> Option<Notifier> {
+        let targets: Vec<NotificationTarget> = NotificationKind::ALL
+            .into_iter()
+            .filter_map(|kind| {
+                kind.webhook_from_env()
+                    .map(|webhook| NotificationTarget { kind, webhook })
+            })
+            .collect();
+
+        if targets.is_empty() {
+            return None;
+        }
+
+        let configuration = NotifierConfiguration {
+            targets,
+            on_lifecycle_event: self.notifications.on_lifecycle_event,
+            on_backup: self.notifications.on_backup,
+            on_backup_failure: self.notifications.on_backup_failure,
+            on_panic: self.notifications.on_panic
+        };
+
+        Some(Notifier::new(
+            context.http_client.clone(),
+            context.shell_handle(),
+            configuration
+        ))
+    }
+}
+
+#[derive(Deserialize, Clone)]
+#[serde(default)]
+pub struct ManifestNotifications {
+    pub on_lifecycle_event: bool,
+    pub on_backup: bool,
+    pub on_backup_failure: bool,
+    pub on_panic: bool
+}
+
+impl Default for ManifestNotifications {
+    fn default() -> Self {
+        ManifestNotifications {
+            on_lifecycle_event: true,
+            on_backup: true,
+            on_backup_failure: true,
+            on_panic: true
         }
     }
 }
@@ -225,8 +282,7 @@ fn flatten_properties(
 pub struct ManifestBackups {
     pub enabled: bool,
     pub frequency: String,
-    pub storage: BackupStorage,
-    pub notifications: ManifestBackupNotifications
+    pub storage: BackupStorage
 }
 
 impl ManifestBackups {
@@ -244,52 +300,6 @@ impl ManifestBackups {
             local => local.clone()
         }
     }
-
-    /// Builds a notifier from the configured provider and its webhook secret.
-    /// Returns `None` when notifications are not configured, or when the provider
-    /// is set but its webhook is missing from the environment (a warning is
-    /// printed in that case, since the secret is intentionally never read from
-    /// `mc.toml`).
-    pub fn notifier(&self, context: &McContext) -> Option<BackupNotifier> {
-        let kind = self.notifications.kind?;
-
-        let Some(webhook) = kind.webhook_from_env() else {
-            _ = context.shell().warn(format!(
-                "backup notifications are enabled but the {} environment variable is not set; no notifications will be sent",
-                kind.webhook_env_var()
-            ));
-
-            return None;
-        };
-
-        Some(BackupNotifier::new(
-            context.http_client.clone(),
-            context.shell_handle(),
-            kind,
-            webhook,
-            self.notifications.on_success,
-            self.notifications.on_failure
-        ))
-    }
-}
-
-#[derive(Deserialize, Clone)]
-#[serde(default)]
-pub struct ManifestBackupNotifications {
-    #[serde(rename = "type")]
-    pub kind: Option<NotificationKind>,
-    pub on_success: bool,
-    pub on_failure: bool
-}
-
-impl Default for ManifestBackupNotifications {
-    fn default() -> Self {
-        ManifestBackupNotifications {
-            kind: None,
-            on_success: true,
-            on_failure: true
-        }
-    }
 }
 
 impl Default for ManifestBackups {
@@ -300,8 +310,7 @@ impl Default for ManifestBackups {
             storage: BackupStorage::Local {
                 path: "backups".into(),
                 keep: 20
-            },
-            notifications: ManifestBackupNotifications::default()
+            }
         }
     }
 }

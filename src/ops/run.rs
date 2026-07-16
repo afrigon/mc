@@ -28,6 +28,7 @@ use crate::ops::java::JavaInstallOptions;
 use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
+use crate::ops::notifications::ServerEvent;
 use crate::utils;
 use crate::utils::errors::McResult;
 
@@ -377,7 +378,15 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .shell()
         .status("Running", format!("`{}`", command_string));
 
+    let notifier = manifest.notifier(context);
+
     let mut child = command.spawn()?;
+
+    if let Some(ref notifier) = notifier {
+        notifier
+            .notify_server(&manifest.name, &ServerEvent::Started)
+            .await;
+    }
 
     // BACKUPS
 
@@ -391,7 +400,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             .filter(|password| !password.is_empty())
             .cloned();
         let storage = manifest.backups.effective_storage();
-        let notifier = manifest.backups.notifier(context);
+        let notifier = notifier.clone();
         let shell = context.shell_handle();
 
         let backup_job = Job::new_async(manifest.backups.frequency, move |_, _| {
@@ -486,6 +495,15 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             }
         }
     };
+
+    if let Some(ref notifier) = notifier {
+        let event = match exit_status {
+            Some(status) if !status.success() => ServerEvent::Crashed(status),
+            _ => ServerEvent::Stopped
+        };
+
+        notifier.notify_server(&manifest.name, &event).await;
+    }
 
     scheduler.shutdown().await?;
 
