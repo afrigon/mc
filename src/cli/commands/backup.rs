@@ -31,13 +31,6 @@ impl CommandHandler for BackupCommand {
         let manifest = toml::from_str::<Manifest>(&manifest_string)
             .map_err(|_| anyhow::anyhow!("could not parse manifest file"))?;
 
-        if !manifest.backups.enabled {
-            return Err(anyhow::anyhow!(
-                "backups are disabled for this instance; set `enabled = true` under [backups] in mc.toml"
-            )
-            .into());
-        }
-
         let instance_path = context.cwd.join("instance");
         let rcon_password = ServerProperties::read_rcon_password(&instance_path).await?;
 
