@@ -264,24 +264,26 @@ impl ServerProperties {
         Ok(password)
     }
 
-    pub fn to_string(
+    pub fn to_entries(
         &self,
         overrides: &BTreeMap<String, String>,
         managed: &BTreeMap<String, String>
-    ) -> McResult<String> {
-        let mut s = serde_java_properties::to_string(self)
+    ) -> McResult<BTreeMap<String, String>> {
+        let s = serde_java_properties::to_string(self)
             .context("could not serialize server.properties")?;
 
-        if !overrides.is_empty() || !managed.is_empty() {
-            let mut entries: BTreeMap<String, String> = serde_java_properties::from_str(&s)
-                .context("could not parse the generated server.properties")?;
+        let mut entries: BTreeMap<String, String> = serde_java_properties::from_str(&s)
+            .context("could not parse the generated server.properties")?;
 
-            entries.extend(overrides.clone());
-            entries.extend(managed.clone());
+        entries.extend(overrides.clone());
+        entries.extend(managed.clone());
 
-            s = serde_java_properties::to_string(&entries)
-                .context("could not serialize server.properties")?;
-        }
+        Ok(entries)
+    }
+
+    pub fn entries_to_string(entries: &BTreeMap<String, String>) -> McResult<String> {
+        let s = serde_java_properties::to_string(entries)
+            .context("could not serialize server.properties")?;
 
         let title = format!(
             "Minecraft server properties, Generated with {} {}",

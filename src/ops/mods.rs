@@ -111,6 +111,7 @@ pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McR
 }
 
 pub struct UpdateModsOptions {
+    pub mods: Vec<String>,
     pub manifest_path: PathBuf
 }
 
@@ -125,7 +126,22 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
 
     if let Some(loader) = minecraft_loader {
-        let mut names: Vec<&String> = manifest.mods.keys().collect();
+        let mut names: Vec<&String> = Vec::new();
+
+        if options.mods.is_empty() {
+            names.extend(manifest.mods.keys());
+        } else {
+            for name in &options.mods {
+                if manifest.mods.contains_key(name) {
+                    names.push(name);
+                } else {
+                    _ = context
+                        .shell()
+                        .error(format!("the mod `{}` could not be found in mods", name));
+                }
+            }
+        }
+
         names.sort();
 
         for name in names {

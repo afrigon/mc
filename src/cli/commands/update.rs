@@ -17,12 +17,17 @@ pub struct UpdateCommand {
         hide_default_value = true,
         value_name = "PATH"
     )]
-    pub manifest_path: PathBuf
+    pub manifest_path: PathBuf,
+
+    /// Mods to update; updates all mods when omitted
+    #[arg(value_name = "MOD_SLUG")]
+    pub mods: Vec<String>
 }
 
 impl CommandHandler for UpdateCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = UpdateModsOptions {
+            mods: self.mods.clone(),
             manifest_path: self.manifest_path.clone()
         };
 

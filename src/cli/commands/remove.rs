@@ -20,7 +20,7 @@ pub struct RemoveCommand {
     pub manifest_path: PathBuf,
 
     /// Reference to a mod to remove
-    #[arg(required = true, value_name = "MOD_ID")]
+    #[arg(required = true, value_name = "MOD_SLUG")]
     pub mods: Vec<String>
 }
 

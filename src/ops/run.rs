@@ -1,5 +1,6 @@
 use std::env;
 use std::io::ErrorKind;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
@@ -35,9 +36,81 @@ use crate::utils::errors::McResult;
 /// our grace window runs before systemd SIGKILLs the unit.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(85);
 
+/// server.properties keys whose values are sensitive.
+const SECRET_PROPERTY_KEYS: [&str; 3] = [
+    "management-server-secret",
+    "management-server-tls-keystore-password",
+    "rcon.password"
+];
+
 pub struct RunOptions {
     pub manifest_path: PathBuf,
     pub lockfile_path: PathBuf
+}
+
+// server.properties can hold plaintext secrets, so it is created readable only
+// by the user running the server.
+#[cfg(unix)]
+async fn write_server_properties(
+    context: &mut McContext,
+    path: &Path,
+    contents: &str,
+    contains_secrets: bool
+) -> McResult<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    match tokio::fs::metadata(path).await {
+        Ok(metadata) => {
+            let mode = metadata.permissions().mode();
+
+            if mode & 0o077 != 0 {
+                if contains_secrets {
+                    anyhow::bail!(
+                        "{} is accessible to other users (mode {:03o}) and holds secrets such as the rcon password; fix it with `chmod 600 {}`",
+                        path.display(),
+                        mode & 0o777,
+                        path.display()
+                    );
+                }
+
+                _ = context.shell().warn(format!(
+                    "{} is accessible to other users (mode {:03o}); fix it with `chmod 600 {}`",
+                    path.display(),
+                    mode & 0o777,
+                    path.display()
+                ));
+            }
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(error).context("could not inspect the server.properties permissions");
+        }
+    }
+
+    let mut file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)
+        .await?;
+
+    file.write_all(contents.as_bytes()).await?;
+    file.flush().await?;
+
+    Ok(())
+}
+
+#[cfg(not(unix))]
+async fn write_server_properties(
+    _context: &mut McContext,
+    path: &Path,
+    contents: &str,
+    _contains_secrets: bool
+) -> McResult<()> {
+    tokio::fs::write(path, contents).await?;
+
+    Ok(())
 }
 
 fn has_jvm_property(arguments: &[String], property: &str) -> bool {
@@ -227,9 +300,19 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         }
     }
 
-    tokio::fs::write(
-        instance_path.join("server.properties"),
-        properties.to_string(&property_overrides, &managed_entries)?
+    let property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
+
+    let contains_secrets = SECRET_PROPERTY_KEYS.iter().any(|key| {
+        property_entries
+            .get(*key)
+            .is_some_and(|value| !value.is_empty())
+    });
+
+    write_server_properties(
+        context,
+        &instance_path.join("server.properties"),
+        &ServerProperties::entries_to_string(&property_entries)?,
+        contains_secrets
     )
     .await?;
 
@@ -303,11 +386,10 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     if manifest.backups.enabled {
         let world_path = instance_path.join(&manifest.name);
         let project_path = path.clone();
-        let rcon_password = managed_entries
+        let rcon_password = property_entries
             .get("rcon.password")
-            .or_else(|| property_overrides.get("rcon.password"))
-            .cloned()
-            .or_else(|| properties.rcon_password.clone());
+            .filter(|password| !password.is_empty())
+            .cloned();
         let storage = manifest.backups.effective_storage();
         let notifier = manifest.backups.notifier(context);
         let shell = context.shell_handle();
