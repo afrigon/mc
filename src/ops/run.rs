@@ -442,6 +442,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .context("could not attach to minecraft process")?;
 
     let mut exit_status = None;
+    let mut forced_down = false;
 
     tokio::select! {
         status = child.wait() => {
@@ -483,6 +484,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                         .shell()
                         .warn("the server did not stop in time, forcing it down");
                     let _ = child.kill().await;
+                    forced_down = true;
                     _ = context.shell().status("Stopped", "the server was forced down");
                 }
                 _ = shutdown_signal() => {
@@ -490,6 +492,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                         .shell()
                         .warn("received a second signal, forcing the server down");
                     let _ = child.kill().await;
+                    forced_down = true;
                     _ = context.shell().status("Stopped", "the server was forced down");
                 }
             }
@@ -499,6 +502,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     if let Some(ref notifier) = notifier {
         let event = match exit_status {
             Some(status) if !status.success() => ServerEvent::Crashed(status),
+            _ if forced_down => ServerEvent::Sigkill,
             _ => ServerEvent::Stopped
         };
 

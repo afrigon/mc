@@ -161,7 +161,8 @@ impl Manifest {
             on_lifecycle_event: self.notifications.on_lifecycle_event,
             on_backup: self.notifications.on_backup,
             on_backup_failure: self.notifications.on_backup_failure,
-            on_panic: self.notifications.on_panic
+            on_panic: self.notifications.on_panic,
+            on_sigkill: self.notifications.on_sigkill
         };
 
         Some(Notifier::new(
@@ -178,7 +179,8 @@ pub struct ManifestNotifications {
     pub on_lifecycle_event: bool,
     pub on_backup: bool,
     pub on_backup_failure: bool,
-    pub on_panic: bool
+    pub on_panic: bool,
+    pub on_sigkill: bool
 }
 
 impl Default for ManifestNotifications {
@@ -187,7 +189,8 @@ impl Default for ManifestNotifications {
             on_lifecycle_event: true,
             on_backup: true,
             on_backup_failure: true,
-            on_panic: true
+            on_panic: true,
+            on_sigkill: true
         }
     }
 }

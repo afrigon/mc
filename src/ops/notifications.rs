@@ -33,7 +33,8 @@ impl NotificationKind {
 pub enum ServerEvent {
     Started,
     Stopped,
-    Crashed(ExitStatus)
+    Crashed(ExitStatus),
+    Sigkill
 }
 
 #[derive(Clone)]
@@ -48,7 +49,8 @@ pub struct NotifierConfiguration {
     pub on_lifecycle_event: bool,
     pub on_backup: bool,
     pub on_backup_failure: bool,
-    pub on_panic: bool
+    pub on_panic: bool,
+    pub on_sigkill: bool
 }
 
 #[derive(Clone)]
@@ -95,6 +97,12 @@ impl Notifier {
             }
             ServerEvent::Crashed(status) if self.configuration.on_panic => {
                 format!("💥 `{}` crashed ({})", name, status)
+            }
+            ServerEvent::Sigkill if self.configuration.on_sigkill => {
+                format!(
+                    "⚠️ `{}` was forced down (SIGKILL) without a clean save",
+                    name
+                )
             }
             _ => return
         };
