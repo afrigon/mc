@@ -185,7 +185,6 @@ impl Default for ServerProperties {
 #[serde(rename_all = "kebab-case")]
 pub struct ManagedServerProperties {
     pub difficulty: MinecraftDifficulty,
-    pub enable_rcon: bool,
     pub gamemode: MinecraftGamemode,
     pub hardcore: bool,
     pub level_name: String,
@@ -218,7 +217,6 @@ impl ManagedServerProperties {
     ) -> ManagedServerProperties {
         ManagedServerProperties {
             difficulty: manifest.server.difficulty,
-            enable_rcon: manifest.backups.enabled,
             gamemode: manifest.server.gamemode,
             hardcore: manifest.server.hardcore,
             level_name: manifest.name.clone(),
@@ -291,8 +289,10 @@ impl ServerProperties {
             env!("CARGO_PKG_VERSION")
         );
 
+        let notice = "This file is generated from mc.toml on every start; manual edits will be lost. Use the [server.properties] section of mc.toml instead.";
+
         let date_string = utils::date::minecraft_date_string()?;
 
-        Ok(format!("#{}\n#{}\n{}", title, date_string, s))
+        Ok(format!("#{}\n#{}\n#{}\n{}", title, notice, date_string, s))
     }
 }

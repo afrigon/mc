@@ -109,7 +109,7 @@ impl CommandHandler for MinecraftListCommand {
 #[derive(Args)]
 pub struct MinecraftListLoadersCommand {
     /// List versions for a specific loader
-    #[arg(short, long, value_parser = value_parser!(LoaderKind))]
+    #[arg(short, long, value_parser = value_parser!(LoaderKind), default_value = "fabric")]
     pub loader: LoaderKind,
 
     /// List loader versions for a specific game version
