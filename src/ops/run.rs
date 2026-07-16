@@ -17,6 +17,7 @@ use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
 use crate::minecraft::log4j;
+use crate::minecraft::server_properties::ManagedServerProperties;
 use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
 use crate::ops::backups::BackupOptions;
@@ -201,21 +202,34 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let mut properties = ServerProperties::default();
 
-    properties.apply(&manifest);
-
     // Backups flush the world over rcon, so an enabled instance needs a password.
-    // Honor an explicit one from the environment, otherwise generate a strong
-    // one so backups work out of the box (enabling rcon without a password would
-    // expose an unauthenticated console).
-    properties.rcon_password = match env::var("MC_RCON_PASSWORD").ok() {
-        Some(password) => Some(password),
+    // The environment password rides the managed layer; the generated fallback
+    // sits in the base layer so a `rcon.password` override can replace it
+    // (enabling rcon without a password would expose an unauthenticated console).
+    let environment_rcon_password = env::var("MC_RCON_PASSWORD").ok();
+
+    properties.rcon_password = match &environment_rcon_password {
         None if manifest.backups.enabled => Some(uuid::Uuid::new_v4().simple().to_string()),
-        None => None
+        _ => None
     };
+
+    let managed = ManagedServerProperties::from_manifest(&manifest, environment_rcon_password);
+    let managed_entries = managed.to_map()?;
+
+    let property_overrides = manifest.server.property_overrides()?;
+
+    for key in property_overrides.keys() {
+        if managed_entries.contains_key(key) {
+            _ = context.shell().warn(format!(
+                "the `{}` entry under [server.properties] conflicts with a value managed through the manifest and was ignored",
+                key
+            ));
+        }
+    }
 
     tokio::fs::write(
         instance_path.join("server.properties"),
-        properties.to_string()?
+        properties.to_string(&property_overrides, &managed_entries)?
     )
     .await?;
 
@@ -289,7 +303,11 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     if manifest.backups.enabled {
         let world_path = instance_path.join(&manifest.name);
         let project_path = path.clone();
-        let rcon_password = properties.rcon_password.clone();
+        let rcon_password = managed_entries
+            .get("rcon.password")
+            .or_else(|| property_overrides.get("rcon.password"))
+            .cloned()
+            .or_else(|| properties.rcon_password.clone());
         let storage = manifest.backups.effective_storage();
         let notifier = manifest.backups.notifier(context);
         let shell = context.shell_handle();

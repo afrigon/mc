@@ -1,10 +1,13 @@
 pub mod lock;
 pub mod presets;
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
 
 use serde::Deserialize;
+use toml::Table;
+use toml::Value;
 use url::Url;
 
 use crate::context::McContext;
@@ -146,7 +149,8 @@ pub struct ManifestServer {
     pub rcon_port: u16,
     pub capacity: i32,
     pub view_distance: u8,
-    pub simulation_distance: u8
+    pub simulation_distance: u8,
+    pub properties: Table
 }
 
 impl Default for ManifestServer {
@@ -163,9 +167,57 @@ impl Default for ManifestServer {
             rcon_port: 25575,
             capacity: 20,
             view_distance: 16,
-            simulation_distance: 16
+            simulation_distance: 16,
+            properties: Table::new()
         }
     }
+}
+
+impl ManifestServer {
+    pub fn property_overrides(&self) -> McResult<BTreeMap<String, String>> {
+        let mut overrides = BTreeMap::new();
+
+        flatten_properties(None, &self.properties, &mut overrides)?;
+
+        Ok(overrides)
+    }
+}
+
+// TOML parses a dotted key like `rcon.port` as nested tables, so nested tables
+// flatten back into dot-joined server.properties keys.
+fn flatten_properties(
+    prefix: Option<&str>,
+    table: &Table,
+    output: &mut BTreeMap<String, String>
+) -> McResult<()> {
+    for (key, value) in table {
+        let key = match prefix {
+            Some(prefix) => format!("{}.{}", prefix, key),
+            None => key.clone()
+        };
+
+        match value {
+            Value::Table(inner) => flatten_properties(Some(&key), inner, output)?,
+            Value::String(value) => {
+                output.insert(key, value.clone());
+            }
+            Value::Integer(value) => {
+                output.insert(key, value.to_string());
+            }
+            Value::Float(value) => {
+                output.insert(key, value.to_string());
+            }
+            Value::Boolean(value) => {
+                output.insert(key, value.to_string());
+            }
+            _ => anyhow::bail!(
+                "the server property `{}` must be a string, integer, float, or boolean",
+                key
+            )
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Deserialize)]

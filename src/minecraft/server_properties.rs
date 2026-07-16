@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::Path;
 
@@ -178,6 +179,70 @@ impl Default for ServerProperties {
     }
 }
 
+// The subset of server.properties driven by `mc.toml` and the environment.
+// Serializing it yields the managed keys.
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ManagedServerProperties {
+    pub difficulty: MinecraftDifficulty,
+    pub enable_rcon: bool,
+    pub gamemode: MinecraftGamemode,
+    pub hardcore: bool,
+    pub level_name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_seed: Option<MinecraftSeed>,
+
+    pub level_type: MinecraftLevelKind,
+    pub max_players: i32,
+    pub motd: String,
+
+    #[serde(rename = "rcon.password", skip_serializing_if = "Option::is_none")]
+    pub rcon_password: Option<String>,
+
+    #[serde(rename = "rcon.port")]
+    pub rcon_port: u16,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_ip: Option<String>,
+
+    pub server_port: u16,
+    pub simulation_distance: u8,
+    pub view_distance: u8
+}
+
+impl ManagedServerProperties {
+    pub fn from_manifest(
+        manifest: &Manifest,
+        rcon_password: Option<String>
+    ) -> ManagedServerProperties {
+        ManagedServerProperties {
+            difficulty: manifest.server.difficulty,
+            enable_rcon: manifest.backups.enabled,
+            gamemode: manifest.server.gamemode,
+            hardcore: manifest.server.hardcore,
+            level_name: manifest.name.clone(),
+            level_seed: manifest.server.seed.clone(),
+            level_type: manifest.server.level_type,
+            max_players: manifest.server.capacity.max(0),
+            motd: manifest.description.clone(),
+            rcon_password,
+            rcon_port: manifest.server.rcon_port,
+            server_ip: manifest.server.ip.clone(),
+            server_port: manifest.server.port,
+            simulation_distance: manifest.server.simulation_distance,
+            view_distance: manifest.server.view_distance
+        }
+    }
+
+    pub fn to_map(&self) -> McResult<BTreeMap<String, String>> {
+        let s = serde_java_properties::to_string(self)
+            .context("could not serialize the managed server properties")?;
+
+        serde_java_properties::from_str(&s).context("could not parse the managed server properties")
+    }
+}
+
 impl ServerProperties {
     /// Reads the configured rcon password from an instance's `server.properties`,
     /// the source of truth for the running server's credentials. Returns `None`
@@ -199,31 +264,24 @@ impl ServerProperties {
         Ok(password)
     }
 
-    pub fn apply(&mut self, manifest: &Manifest) {
-        self.level_name = manifest.name.clone();
-        self.motd = manifest.description.clone();
-        self.enable_rcon = manifest.backups.enabled;
-        self.rcon_port = manifest.server.rcon_port;
-        self.server_port = manifest.server.port;
-
-        // Only override the default bind address when the manifest sets one, so
-        // the IPv6 wildcard default is preserved otherwise.
-        if manifest.server.ip.is_some() {
-            self.server_ip = manifest.server.ip.clone();
-        }
-        self.gamemode = manifest.server.gamemode;
-        self.difficulty = manifest.server.difficulty;
-        self.hardcore = manifest.server.hardcore;
-        self.max_players = manifest.server.capacity.max(0);
-        self.level_type = manifest.server.level_type;
-        self.level_seed = manifest.server.seed.clone();
-        self.view_distance = manifest.server.view_distance;
-        self.simulation_distance = manifest.server.simulation_distance;
-    }
-
-    pub fn to_string(&self) -> McResult<String> {
-        let s = serde_java_properties::to_string(self)
+    pub fn to_string(
+        &self,
+        overrides: &BTreeMap<String, String>,
+        managed: &BTreeMap<String, String>
+    ) -> McResult<String> {
+        let mut s = serde_java_properties::to_string(self)
             .context("could not serialize server.properties")?;
+
+        if !overrides.is_empty() || !managed.is_empty() {
+            let mut entries: BTreeMap<String, String> = serde_java_properties::from_str(&s)
+                .context("could not parse the generated server.properties")?;
+
+            entries.extend(overrides.clone());
+            entries.extend(managed.clone());
+
+            s = serde_java_properties::to_string(&entries)
+                .context("could not serialize server.properties")?;
+        }
 
         let title = format!(
             "Minecraft server properties, Generated with {} {}",
