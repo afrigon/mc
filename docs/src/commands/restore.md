@@ -8,8 +8,15 @@ Replaces the world with one restored from a backup. The instance must be
 stopped.
 
 The world being replaced is moved aside rather than deleted; if the restore
-fails, it is put back and the command reports the failure. One set-aside
-world is kept until the next restore replaces it.
+fails or is cancelled with `Ctrl-C`, the partially extracted world is
+removed, the original is put back, and the command reports the failure. One
+set-aside world is kept until the next restore replaces it.
+
+A restore killed with no chance to clean up (power loss, SIGKILL) can leave
+no world in place while the set-aside copy still exists. `mc run` refuses
+to start in that state — instead of silently generating a fresh world — and
+explains how to recover: run `mc restore` again, or rename the set-aside
+directory back.
 
 ## Options
 

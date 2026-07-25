@@ -27,6 +27,13 @@ Names may contain ASCII letters, digits, `-` and `_`. If a backup with the
 same name already exists, mc asks before overwriting it (and refuses when it
 cannot ask, such as in a script).
 
+## Cancelling
+
+`Ctrl-C` cancels a backup in progress: the partial archive is discarded,
+the instance's auto-save is re-enabled, and the command fails with a
+non-zero exit status. Stored backups are never affected by a cancelled
+run.
+
 ## Options
 
 - `--name <NAME>` — store the backup under a name and keep it forever

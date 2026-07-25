@@ -10,8 +10,10 @@ use std::sync::PoisonError;
 
 use anyhow::Context;
 use chrono::NaiveDateTime;
+use minecraft_client_rs::Client;
 use serde::Deserialize;
 use tempfile::NamedTempFile;
+use tokio_util::sync::CancellationToken;
 
 use crate::context::McContext;
 use crate::ops::backups::local::LocalBackupBackend;
@@ -181,7 +183,8 @@ pub struct BackupOptions {
     pub rcon_password: Option<String>,
     pub notifier: Option<Notifier>,
     pub name: Option<String>,
-    pub shell: Arc<Mutex<Shell>>
+    pub shell: Arc<Mutex<Shell>>,
+    pub cancel: CancellationToken
 }
 
 pub async fn backup(options: &BackupOptions) -> McResult<()> {
@@ -282,9 +285,6 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
         rcon.send_command("save-off".to_string())
             .map_err(|_| anyhow::anyhow!("could not disable auto-save over rcon"))?;
 
-        rcon.send_command("save-all flush".to_string())
-            .map_err(|_| anyhow::anyhow!("could not flush the world to disk over rcon"))?;
-
         None
     } else {
         Some(world_lock.try_acquire()?.context(
@@ -293,21 +293,36 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
     };
 
     let staging = options.project_path.join("temp");
-    tokio::fs::create_dir_all(&staging).await?;
 
-    let exclude = HashSet::from([PathBuf::from("session.lock")]);
-    let archive =
-        utils::archive::inflate_tar_gz(options.world_path.clone(), &exclude, &staging).await?;
+    // Auto-save is disabled from here until the save-on below: the outcome is
+    // collected instead of propagated so it is always re-enabled first.
+    let archive_result = archive_world(options, &mut rcon, &staging).await;
+
+    if archive_result.is_err() && options.cancel.is_cancelled() {
+        let mut shell = options.shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+        _ = shell.status("Cancelling", "discarding the partial archive");
+    }
 
     if let Some(rcon) = &mut rcon {
-        rcon.send_command("save-on".to_string())
-            .map_err(|_| anyhow::anyhow!("could not re-enable auto-save over rcon"))?;
-
+        let restored = rcon.send_command("save-on".to_string());
         let _ = rcon.close();
+
+        if restored.is_err() {
+            if archive_result.is_ok() {
+                anyhow::bail!("could not re-enable auto-save over rcon");
+            }
+
+            let mut shell = options.shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+            _ = shell.warn("could not re-enable auto-save over rcon");
+        }
     }
 
     // The world is fully archived; release it so the server can start again.
     drop(world_guard);
+
+    let archive = archive_result?;
 
     backend.backup(&filename, archive).await?;
 
@@ -323,6 +338,31 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
     drop(backup_guard);
 
     Ok(())
+}
+
+/// The span while auto-save is disabled: flush the world, then archive it,
+/// racing cancellation. The caller collects the outcome instead of `?`-ing so
+/// `save-on` is never skipped.
+async fn archive_world(
+    options: &BackupOptions,
+    rcon: &mut Option<Client>,
+    staging: &Path
+) -> McResult<NamedTempFile> {
+    if let Some(rcon) = rcon {
+        rcon.send_command("save-all flush".to_string())
+            .map_err(|_| anyhow::anyhow!("could not flush the world to disk over rcon"))?;
+    }
+
+    tokio::fs::create_dir_all(staging).await?;
+
+    let exclude = HashSet::from([PathBuf::from("session.lock")]);
+
+    tokio::select! {
+        archive = utils::archive::inflate_tar_gz(options.world_path.clone(), &exclude, staging) => {
+            archive
+        }
+        _ = options.cancel.cancelled() => Err(anyhow::anyhow!("the backup was cancelled"))
+    }
 }
 
 pub struct ListOptions {
@@ -364,7 +404,8 @@ pub struct RestoreOptions {
     pub project_path: PathBuf,
     pub world_path: PathBuf,
     pub storage: BackupStorage,
-    pub version: Option<String>
+    pub version: Option<String>,
+    pub cancel: CancellationToken
 }
 
 pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McResult<()> {
@@ -446,10 +487,14 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
     let staging = options.project_path.join("temp");
     tokio::fs::create_dir_all(&staging).await?;
 
-    let result = match backend
-        .restore(context, &filename, &options.world_path, &staging)
-        .await
-    {
+    // Cancellation surfaces as an error so the rollback below runs and the
+    // partially extracted world is never left in place.
+    let restore_result = tokio::select! {
+        result = backend.restore(context, &filename, &options.world_path, &staging) => result,
+        _ = options.cancel.cancelled() => Err(anyhow::anyhow!("the restore was cancelled"))
+    };
+
+    let result = match restore_result {
         Ok(()) => {
             _ = context.shell().status("Finished", "world restored");
 

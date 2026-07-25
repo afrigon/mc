@@ -26,6 +26,10 @@ world and shut down, and waits for it to exit before returning. If the
 instance hangs past a grace period, or a second signal arrives, it is forced
 down immediately.
 
+A scheduled backup caught in flight is cancelled: it discards its partial
+archive and never damages stored backups — see
+[Backups](../guides/backups.md).
+
 mc does not restart a crashed instance; run it under a supervisor for that —
 see [Running under systemd](../guides/systemd.md).
 

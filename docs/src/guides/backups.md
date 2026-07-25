@@ -35,6 +35,19 @@ an RCON password configured (always the case when backups are enabled). When
 the instance is running but cannot be reached, mc refuses to back up rather
 than capture a world that is still being written to.
 
+## Interruptions
+
+Backups are safe to interrupt. `Ctrl-C` cancels a backup in progress: the
+partial archive is discarded and the instance's auto-save is re-enabled
+before the error is reported — the same recovery runs when a backup fails
+on its own. Stopping an instance while a scheduled backup is running
+cancels the backup the same way.
+
+A backup killed with no chance to clean up (power loss, SIGKILL) cannot
+re-enable auto-save. As a last line of defense, mc turns auto-save on
+whenever an instance starts, as soon as it accepts remote console
+connections.
+
 ## Storage
 
 Archives go to a storage target configured under `[backups.storage]`. Two

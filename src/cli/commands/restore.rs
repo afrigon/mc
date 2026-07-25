@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::Args;
+use tokio_util::sync::CancellationToken;
 
 use crate::cli::CommandHandler;
 use crate::context::McContext;
@@ -10,6 +11,7 @@ use crate::ops;
 use crate::ops::backups::ListOptions;
 use crate::ops::backups::RestoreOptions;
 use crate::utils::errors::CliResult;
+use crate::utils::process::ShutdownSignals;
 
 #[derive(Args)]
 pub struct RestoreCommand {
@@ -52,11 +54,24 @@ impl CommandHandler for RestoreCommand {
 
         // TODO: create a backup before restoring, if not empty
 
+        let cancel = CancellationToken::new();
+        let mut signals = ShutdownSignals::register()?;
+
+        {
+            let cancel = cancel.clone();
+
+            tokio::spawn(async move {
+                signals.recv().await;
+                cancel.cancel();
+            });
+        }
+
         let options = RestoreOptions {
             storage: manifest.backups.effective_storage(),
             world_path: context.cwd.join("instance").join(&manifest.name),
             project_path: context.cwd.clone(),
-            version: self.backup.clone()
+            version: self.backup.clone(),
+            cancel
         };
 
         ops::backups::restore(context, &options).await?;

@@ -12,6 +12,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
+use tokio_util::sync::CancellationToken;
 
 use crate::context::McContext;
 use crate::env::Architecture;
@@ -175,6 +176,20 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     match tokio::fs::remove_dir_all(&staging_path).await {
         Err(error) if error.kind() != ErrorKind::NotFound => return Err(error.into()),
         _ => {}
+    }
+
+    // A missing world alongside a `.restore.bak` can only mean a restore died
+    // before putting a world in place; starting now would silently generate a
+    // fresh one.
+    let world_path = instance_path.join(&manifest.name);
+    let aside_path = world_path.with_extension("restore.bak");
+
+    if !tokio::fs::try_exists(&world_path).await? && tokio::fs::try_exists(&aside_path).await? {
+        anyhow::bail!(
+            "an interrupted restore left no world at `{}`; run `mc restore` again, or rename `{}` back to recover the previous world",
+            world_path.display(),
+            aside_path.display()
+        );
     }
 
     // EULA
@@ -378,20 +393,53 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             .await;
     }
 
+    let rcon_password = property_entries
+        .get("rcon.password")
+        .filter(|password| !password.is_empty())
+        .cloned();
+
+    // Auto-save is asserted once the server accepts rcon connections, so
+    // nothing — a mod, an unusual recovery state, or a differing server
+    // default — can leave an instance silently not saving.
+    if let Some(password) = rcon_password.clone() {
+        let rcon_port = manifest.server.rcon_port;
+        let shell = context.shell_handle();
+
+        tokio::spawn(async move {
+            for _ in 0..60 {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+
+                if let Some(mut rcon) = ops::backups::connect_rcon(rcon_port, &password) {
+                    if rcon.send_command("save-on".to_string()).is_ok() {
+                        tracing::debug!("asserted auto-save at startup");
+                    }
+
+                    let _ = rcon.close();
+
+                    return;
+                }
+            }
+
+            let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+            _ = shell.warn("could not reach the server over rcon to assert auto-save");
+        });
+    }
+
     // BACKUPS
+
+    let backup_cancel = CancellationToken::new();
 
     let mut scheduler = JobScheduler::new().await?;
 
     if manifest.backups.enabled {
         let world_path = instance_path.join(&manifest.name);
         let project_path = path.clone();
-        let rcon_password = property_entries
-            .get("rcon.password")
-            .filter(|password| !password.is_empty())
-            .cloned();
+        let rcon_password = rcon_password.clone();
         let storage = manifest.backups.effective_storage();
         let notifier = notifier.clone();
         let shell = context.shell_handle();
+        let cancel = backup_cancel.clone();
 
         let backup_job = Job::new_async(manifest.backups.frequency, move |_, _| {
             let project_path = project_path.clone();
@@ -400,6 +448,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             let rcon_password = rcon_password.clone();
             let notifier = notifier.clone();
             let shell = shell.clone();
+            let cancel = cancel.clone();
 
             Box::pin(async move {
                 let backup_options = BackupOptions {
@@ -410,7 +459,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     rcon_password,
                     notifier,
                     name: None,
-                    shell: shell.clone()
+                    shell: shell.clone(),
+                    cancel
                 };
 
                 if let Err(error) = ops::backups::backup(&backup_options).await {
@@ -440,6 +490,11 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             exit_status = Some(status?);
         }
         _ = shutdown.recv() => {
+            // An in-flight scheduled backup restores auto-save and discards
+            // its partial archive on cancellation; the server can stop
+            // without waiting on it.
+            backup_cancel.cancel();
+
             _ = context
                 .shell()
                 .status("Stopping", "asking the server to save and shut down");
