@@ -20,8 +20,9 @@ remote console (RCON) for live administration.
 
 ## Stopping
 
-`Ctrl-C` (or SIGTERM, e.g. from a service manager) asks the instance to save
-the world and shut down, and waits for it to exit before returning. If the
+`Ctrl-C` (or SIGTERM, e.g. from a service manager, or SIGHUP, e.g. when the
+terminal that started the instance closes) asks the instance to save the
+world and shut down, and waits for it to exit before returning. If the
 instance hangs past a grace period, or a second signal arrives, it is forced
 down immediately.
 

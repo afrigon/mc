@@ -142,31 +142,6 @@ fn sanitize_command(command: &Command) -> String {
         .join(" ")
 }
 
-/// Resolves when a shutdown signal arrives: Ctrl-C everywhere, plus SIGTERM on
-/// Unix so `systemctl stop` triggers a graceful shutdown.
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        use tokio::signal::unix::SignalKind;
-        use tokio::signal::unix::signal;
-
-        let mut interrupt =
-            signal(SignalKind::interrupt()).expect("failed to register the SIGINT handler");
-        let mut terminate =
-            signal(SignalKind::terminate()).expect("failed to register the SIGTERM handler");
-
-        tokio::select! {
-            _ = interrupt.recv() => {}
-            _ = terminate.recv() => {}
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        let _ = tokio::signal::ctrl_c().await;
-    }
-}
-
 // TODO: validate error context for all cases.
 // - invalid versions
 // - invalid toml format
@@ -393,6 +368,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let notifier = manifest.notifier(context);
 
+    let mut shutdown = utils::process::ShutdownSignals::register()?;
+
     let mut child = command.spawn()?;
 
     if let Some(ref notifier) = notifier {
@@ -462,7 +439,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             // the server exited on its own
             exit_status = Some(status?);
         }
-        _ = shutdown_signal() => {
+        _ = shutdown.recv() => {
             _ = context
                 .shell()
                 .status("Stopping", "asking the server to save and shut down");
@@ -500,7 +477,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     forced_down = true;
                     _ = context.shell().status("Stopped", "the server was forced down");
                 }
-                _ = shutdown_signal() => {
+                _ = shutdown.recv() => {
                     _ = context
                         .shell()
                         .warn("received a second signal, forcing the server down");
