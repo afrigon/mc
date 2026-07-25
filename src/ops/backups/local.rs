@@ -37,6 +37,8 @@ impl LocalBackupBackend {
             .filter(|filename| super::is_automatic_backup(filename, &self.world_name));
 
         for filename in automatic.skip(self.keep) {
+            tracing::info!("pruning backup `{}`", filename);
+
             tokio::fs::remove_file(self.directory.join(filename)).await?;
         }
 
