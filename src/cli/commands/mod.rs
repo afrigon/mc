@@ -1,5 +1,6 @@
 pub mod add;
 pub mod backup;
+pub mod completions;
 pub mod init;
 pub mod java;
 pub mod minecraft;
@@ -12,6 +13,7 @@ use clap::Subcommand;
 
 use crate::cli::commands::add::AddCommand;
 use crate::cli::commands::backup::BackupCommand;
+use crate::cli::commands::completions::CompletionsCommand;
 use crate::cli::commands::init::InitCommand;
 use crate::cli::commands::java::JavaCommand;
 use crate::cli::commands::minecraft::MinecraftCommand;
@@ -45,7 +47,10 @@ pub enum CliCommand {
     Backup(BackupCommand),
 
     /// Restore a backup
-    Restore(RestoreCommand)
+    Restore(RestoreCommand),
+
+    /// Generate a shell completion script
+    Completions(CompletionsCommand)
 }
 
 // TODO: use refs + lifetime in the option structs to avoid cloning the cli args.

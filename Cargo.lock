@@ -750,6 +750,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db8b397918185f0161ff3d6fcaa9e4bfc09b8367caf6e1d4a2848e5477ed027b"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.5.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1929,7 +1938,7 @@ dependencies = [
 
 [[package]]
 name = "mc"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "annotate-snippets",
  "anstream",
@@ -1942,6 +1951,7 @@ dependencies = [
  "chrono",
  "chrono-tz",
  "clap",
+ "clap_complete",
  "digest",
  "directories",
  "fd-lock",

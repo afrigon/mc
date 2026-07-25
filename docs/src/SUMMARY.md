@@ -20,6 +20,7 @@
     - [General Commands](./commands/general.md)
         - [mc](./commands/mc.md)
         - [mc help](./commands/help.md)
+        - [mc completions](./commands/completions.md)
     - [Manifest Commands](./commands/manifest.md)
         - [mc init](./commands/init.md)
         - [mc add](./commands/add.md)
