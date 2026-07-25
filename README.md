@@ -7,7 +7,7 @@ rest:
 
 - installs a Java runtime, the Minecraft binary, a mod loader, and mods
 - manages mods with a lockfile (`mc add`, `mc remove`, `mc update`)
-- runs the server with clean shutdown, ready to deploy under systemd
+- runs the server with clean shutdown
 - takes scheduled world backups, stored locally or on S3
 
 ## Quick start
