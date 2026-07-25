@@ -51,9 +51,15 @@ impl BackupBackend for LocalBackupBackend {
         let target = self.directory.join(filename);
 
         // `persist` is a rename, which fails when the backup directory is on a
-        // different filesystem than the staging area; copy instead in that case.
+        // different filesystem than the staging area. In that case, copy into
+        // a temp file next to the target and rename, so an interrupted copy
+        // can never leave a partial or truncated backup behind.
         if let Err(error) = archive.persist(&target) {
-            tokio::fs::copy(error.file.path(), &target).await?;
+            let staged = NamedTempFile::new_in(&self.directory)?;
+
+            tokio::fs::copy(error.file.path(), staged.path()).await?;
+
+            staged.persist(&target)?;
         }
 
         self.prune().await?;

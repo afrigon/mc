@@ -50,6 +50,10 @@ path = "backups"
 keep = 20
 ```
 
+Archives appear in the directory atomically: an interrupted backup never
+leaves a partial archive under a backup name or damages the backup it was
+about to replace.
+
 **S3** uploads archives to a bucket:
 
 ```toml
