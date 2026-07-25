@@ -14,12 +14,28 @@ the instance is running but the remote console is not available, the command
 refuses rather than capture a world that is still being written to. Only one
 backup can run at a time.
 
+## Named backups
+
+By default the archive is named after the instance and a timestamp, and is
+subject to the storage's retention limit. With `--name`, the archive is
+stored under the given name instead — for example
+`myserver_pre-update.tar.gz` — and is kept forever: named backups never
+count toward the retention limit and are never pruned. They appear in
+[`mc restore --list`](restore.md) alongside automatic backups.
+
+Names may contain ASCII letters, digits, `-` and `_`. If a backup with the
+same name already exists, mc asks before overwriting it (and refuses when it
+cannot ask, such as in a script).
+
 ## Options
 
+- `--name <NAME>` — store the backup under a name and keep it forever
+  instead of timestamping it and rotating it out.
 - `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
 
 ## Examples
 
 ```console
 $ mc backup
+$ mc backup --name pre-update
 ```

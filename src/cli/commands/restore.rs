@@ -41,7 +41,8 @@ impl CommandHandler for RestoreCommand {
 
         if self.list {
             let options = ListOptions {
-                storage: manifest.backups.effective_storage()
+                storage: manifest.backups.effective_storage(),
+                world_name: manifest.name.clone()
             };
 
             ops::backups::list(context, &options).await?;

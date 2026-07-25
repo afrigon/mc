@@ -14,19 +14,29 @@ use crate::utils::errors::McResult;
 
 pub struct LocalBackupBackend {
     directory: PathBuf,
-    keep: usize
+    keep: usize,
+    world_name: String
 }
 
 impl LocalBackupBackend {
-    pub fn new(directory: PathBuf, keep: usize) -> LocalBackupBackend {
-        LocalBackupBackend { directory, keep }
+    pub fn new(directory: PathBuf, keep: usize, world_name: String) -> LocalBackupBackend {
+        LocalBackupBackend {
+            directory,
+            keep,
+            world_name
+        }
     }
 
-    /// Delete the oldest backups beyond the retention limit.
+    /// Delete the oldest automatic backups beyond the retention limit. Named
+    /// backups are kept forever and do not count toward the limit.
     async fn prune(&self) -> McResult<()> {
         let backups = self.list().await?;
 
-        for filename in backups.into_iter().skip(self.keep) {
+        let automatic = backups
+            .into_iter()
+            .filter(|filename| super::is_automatic_backup(filename, &self.world_name));
+
+        for filename in automatic.skip(self.keep) {
             tokio::fs::remove_file(self.directory.join(filename)).await?;
         }
 
@@ -64,13 +74,15 @@ impl BackupBackend for LocalBackupBackend {
             let filename = entry.file_name();
 
             if let Some(filename) = filename.to_str() {
-                if filename.ends_with(".tar.gz") {
+                if super::is_instance_backup(filename, &self.world_name) {
                     backups.push(filename.to_string());
                 }
             }
         }
 
-        // Filenames are timestamped, so a reverse lexicographic sort is newest first.
+        // Automatic filenames embed a timestamp, so a reverse lexicographic
+        // sort orders them newest first; named backups land wherever their
+        // name sorts.
         backups.sort_by(|a, b| b.cmp(a));
 
         Ok(backups)

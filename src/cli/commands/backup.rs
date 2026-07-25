@@ -20,7 +20,12 @@ pub struct BackupCommand {
         hide_default_value = true,
         value_name = "PATH"
     )]
-    pub manifest_path: PathBuf
+    pub manifest_path: PathBuf,
+
+    /// Name the backup instead of timestamping it; named backups are kept
+    /// forever, exempt from the retention limit
+    #[arg(long, value_name = "NAME")]
+    pub name: Option<String>
 }
 
 impl CommandHandler for BackupCommand {
@@ -40,7 +45,9 @@ impl CommandHandler for BackupCommand {
             storage: manifest.backups.effective_storage(),
             world_path: instance_path.join(&manifest.name),
             project_path: context.cwd.clone(),
-            notifier: manifest.notifier(context)
+            notifier: manifest.notifier(context),
+            name: self.name.clone(),
+            shell: context.shell_handle()
         };
 
         ops::backups::backup(&options).await?;

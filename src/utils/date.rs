@@ -11,6 +11,8 @@ pub fn minecraft_date_string() -> McResult<String> {
     Ok(date.format("%a %b %d %H:%M:%S %Z %Y").to_string())
 }
 
+pub const FILENAME_DATE_FORMAT: &str = "%Y-%m-%d_%H-%M-%S";
+
 pub fn filename_date_string() -> String {
-    Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string()
+    Utc::now().format(FILENAME_DATE_FORMAT).to_string()
 }

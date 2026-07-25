@@ -408,15 +408,15 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     storage,
                     rcon_port: manifest.server.rcon_port,
                     rcon_password,
-                    notifier
+                    notifier,
+                    name: None,
+                    shell: shell.clone()
                 };
 
-                let result = ops::backups::backup(&backup_options).await;
-                let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
+                if let Err(error) = ops::backups::backup(&backup_options).await {
+                    let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
 
-                match result {
-                    Ok(_) => _ = shell.status("Finished", "world backup complete"),
-                    Err(error) => _ = shell.error(format!("backup failed: {:?}", error))
+                    _ = shell.error(format!("backup failed: {:?}", error));
                 }
             })
         })?;

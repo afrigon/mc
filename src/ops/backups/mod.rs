@@ -4,8 +4,12 @@ pub mod s3;
 use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::PoisonError;
 
 use anyhow::Context;
+use chrono::NaiveDateTime;
 use serde::Deserialize;
 use tempfile::NamedTempFile;
 
@@ -16,14 +20,15 @@ use crate::ops::lock::InstanceLocks;
 use crate::ops::notifications::Notifier;
 use crate::utils;
 use crate::utils::errors::McResult;
+use crate::utils::shell::Shell;
 
 pub trait BackupBackend {
     /// Store `archive` under `filename`.
     async fn backup(&self, filename: &str, archive: NamedTempFile) -> McResult<()>;
 
-    /// List the filenames of every stored backup, newest first. The storage
-    /// location (bucket or directory) is dedicated to this instance, so every
-    /// entry it holds is one of this instance's backups.
+    /// List the filenames of every backup belonging to this instance
+    /// (`{world}_*.tar.gz`), newest first. Unrelated files in the storage
+    /// location (bucket or directory) are ignored.
     async fn list(&self) -> McResult<Vec<String>>;
 
     /// Download `filename` and extract it into `output`. `output` must not
@@ -47,14 +52,14 @@ pub enum Backend {
 }
 
 impl Backend {
-    pub fn from_storage(storage: &BackupStorage) -> McResult<Backend> {
+    pub fn from_storage(storage: &BackupStorage, world_name: &str) -> McResult<Backend> {
         let backend = match storage {
             BackupStorage::S3 { bucket } => {
                 let bucket = bucket.clone().context(
                     "no S3 bucket is configured; set `bucket` under `[backups.storage]` in mc.toml or the MC_BACKUPS_S3_BUCKET environment variable"
                 )?;
 
-                Backend::S3(S3BackupBackend::new(bucket))
+                Backend::S3(S3BackupBackend::new(bucket, world_name.to_string()))
             }
             BackupStorage::Local { path, keep } => {
                 if *keep == 0 {
@@ -63,7 +68,11 @@ impl Backend {
                     );
                 }
 
-                Backend::Local(LocalBackupBackend::new(path.clone(), *keep))
+                Backend::Local(LocalBackupBackend::new(
+                    path.clone(),
+                    *keep,
+                    world_name.to_string()
+                ))
             }
         };
 
@@ -100,6 +109,49 @@ impl BackupBackend for Backend {
     }
 }
 
+/// A backup belonging to this instance: `{world}_{anything}.tar.gz`. Both
+/// automatic backups and named ones (created with `--name` or by manually
+/// renaming a file to this shape) qualify; anything else in the storage
+/// location is invisible to mc and never touched.
+fn is_instance_backup(filename: &str, world_name: &str) -> bool {
+    filename
+        .strip_prefix(world_name)
+        .and_then(|rest| rest.strip_prefix('_'))
+        .is_some_and(|rest| rest.ends_with(".tar.gz"))
+}
+
+/// An automatic backup: `{world}_{timestamp}.tar.gz`. Only these are subject
+/// to retention pruning and eligible as the implicit "latest" restore target.
+fn is_automatic_backup(filename: &str, world_name: &str) -> bool {
+    filename
+        .strip_prefix(world_name)
+        .and_then(|rest| rest.strip_prefix('_'))
+        .and_then(|rest| rest.strip_suffix(".tar.gz"))
+        .is_some_and(|timestamp| {
+            NaiveDateTime::parse_from_str(timestamp, utils::date::FILENAME_DATE_FORMAT).is_ok()
+        })
+}
+
+fn validate_backup_name(name: &str) -> McResult<()> {
+    let valid = !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+
+    if !valid {
+        anyhow::bail!("backup names may only contain ASCII letters, digits, `-` and `_`");
+    }
+
+    if NaiveDateTime::parse_from_str(name, utils::date::FILENAME_DATE_FORMAT).is_ok() {
+        anyhow::bail!(
+            "backup name `{}` would be mistaken for an automatic backup timestamp; pick a different name",
+            name
+        );
+    }
+
+    Ok(())
+}
+
 fn default_keep() -> usize {
     20
 }
@@ -127,10 +179,11 @@ pub struct BackupOptions {
     pub storage: BackupStorage,
     pub rcon_port: u16,
     pub rcon_password: Option<String>,
-    pub notifier: Option<Notifier>
+    pub notifier: Option<Notifier>,
+    pub name: Option<String>,
+    pub shell: Arc<Mutex<Shell>>
 }
 
-// TODO: improve scheduler code so that we can take in McContext here.
 pub async fn backup(options: &BackupOptions) -> McResult<()> {
     let result = run_backup(options).await;
 
@@ -156,13 +209,56 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
         .try_acquire()?
         .context("a backup is already in progress for this instance")?;
 
-    let backend = Backend::from_storage(&options.storage)?;
+    let world_name = options
+        .world_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("could not determine world name from path")?;
+
+    let backend = Backend::from_storage(&options.storage, world_name)?;
 
     if !tokio::fs::try_exists(&options.world_path).await? {
         anyhow::bail!(
             "there is no world to back up yet at `{}`",
             options.world_path.display()
         );
+    }
+
+    let filename = match &options.name {
+        Some(name) => {
+            validate_backup_name(name)?;
+
+            let filename = format!("{}_{}.tar.gz", world_name, name);
+
+            if backend.list().await?.contains(&filename) {
+                let question = format!(
+                    "a backup named `{}` already exists, overwrite it?",
+                    filename
+                );
+                let overwrite = {
+                    let mut shell = options.shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+                    utils::prompt::confirm(&mut shell, &question)?
+                };
+
+                if !overwrite {
+                    anyhow::bail!("a backup named `{}` already exists", filename);
+                }
+            }
+
+            filename
+        }
+        None => format!(
+            "{}_{}.tar.gz",
+            world_name,
+            utils::date::filename_date_string()
+        )
+    };
+
+    {
+        let mut shell = options.shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+        _ = shell.status("Archiving", format!("world to `{}`", filename));
     }
 
     let mut world_lock = locks.world()?;
@@ -213,15 +309,13 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
     // The world is fully archived; release it so the server can start again.
     drop(world_guard);
 
-    let name = options
-        .world_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .context("could not determine world name from path")?;
-
-    let filename = format!("{}_{}.tar.gz", name, utils::date::filename_date_string());
-
     backend.backup(&filename, archive).await?;
+
+    {
+        let mut shell = options.shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+        _ = shell.status("Finished", "archiving world");
+    }
 
     let _ = tokio::fs::remove_dir(&staging).await;
 
@@ -232,11 +326,12 @@ async fn run_backup(options: &BackupOptions) -> McResult<()> {
 }
 
 pub struct ListOptions {
-    pub storage: BackupStorage
+    pub storage: BackupStorage,
+    pub world_name: String
 }
 
 pub async fn list(context: &mut McContext, options: &ListOptions) -> McResult<()> {
-    let backend = Backend::from_storage(&options.storage)?;
+    let backend = Backend::from_storage(&options.storage, &options.world_name)?;
     let backups = backend.list().await?;
 
     if backups.is_empty() {
@@ -245,11 +340,17 @@ pub async fn list(context: &mut McContext, options: &ListOptions) -> McResult<()
         return Ok(());
     }
 
+    // The implicit restore target is the newest automatic backup, which is not
+    // necessarily the first entry once named backups are in the sort.
+    let latest = backups
+        .iter()
+        .position(|backup| is_automatic_backup(backup, &options.world_name));
+
     let mut shell = context.shell();
     let stdout = shell.out();
 
     for (i, backup) in backups.iter().enumerate() {
-        if i == 0 {
+        if Some(i) == latest {
             writeln!(stdout, "{} (latest)", backup)?;
         } else {
             writeln!(stdout, "{}", backup)?;
@@ -283,7 +384,13 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
         .try_acquire()?
         .context("a backup is in progress; wait for it to finish before restoring")?;
 
-    let backend = Backend::from_storage(&options.storage)?;
+    let world_name = options
+        .world_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("could not determine world name from path")?;
+
+    let backend = Backend::from_storage(&options.storage, world_name)?;
 
     let backups = backend.list().await?;
 
@@ -303,8 +410,15 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
                     backups.join("\n  ")
                 )
             })?,
-        // `list` is sorted newest first, so the first entry is the latest backup.
-        None => backups[0].clone()
+        // `list` is sorted newest first, so the first automatic entry is the
+        // latest one. Named backups are only ever restored explicitly.
+        None => backups
+            .iter()
+            .find(|name| is_automatic_backup(name, world_name))
+            .cloned()
+            .context(
+                "no automatic backups were found to restore; pass --backup <filename> to restore a named backup"
+            )?
     };
 
     _ = context

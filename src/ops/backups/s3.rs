@@ -9,12 +9,13 @@ use crate::services;
 use crate::utils::errors::McResult;
 
 pub struct S3BackupBackend {
-    bucket: String
+    bucket: String,
+    world_name: String
 }
 
 impl S3BackupBackend {
-    pub fn new(bucket: String) -> S3BackupBackend {
-        S3BackupBackend { bucket }
+    pub fn new(bucket: String, world_name: String) -> S3BackupBackend {
+        S3BackupBackend { bucket, world_name }
     }
 }
 
@@ -26,9 +27,15 @@ impl BackupBackend for S3BackupBackend {
     }
 
     async fn list(&self) -> McResult<Vec<String>> {
-        let mut backups = services::s3_api::list_keys(&self.bucket).await?;
+        let mut backups: Vec<String> = services::s3_api::list_keys(&self.bucket)
+            .await?
+            .into_iter()
+            .filter(|key| super::is_instance_backup(key, &self.world_name))
+            .collect();
 
-        // Keys are timestamped, so a reverse lexicographic sort is newest first.
+        // Automatic keys embed a timestamp, so a reverse lexicographic sort
+        // orders them newest first; named backups land wherever their name
+        // sorts.
         backups.sort_by(|a, b| b.cmp(a));
 
         Ok(backups)
