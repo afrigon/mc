@@ -10,6 +10,7 @@ use crate::manifest::Manifest;
 use crate::ops;
 use crate::ops::backups::ListOptions;
 use crate::ops::backups::RestoreOptions;
+use crate::ops::backups::UndoRestoreOptions;
 use crate::utils::errors::CliResult;
 use crate::utils::process::ShutdownSignals;
 
@@ -30,7 +31,12 @@ pub struct RestoreCommand {
 
     /// List the available backups instead of restoring
     #[arg(long, conflicts_with = "backup")]
-    pub list: bool
+    pub list: bool,
+
+    /// Put the world set aside by the last restore back in place, swapping it
+    /// with the current world
+    #[arg(long, conflicts_with_all = ["backup", "list"])]
+    pub undo: bool
 }
 
 impl CommandHandler for RestoreCommand {
@@ -52,7 +58,16 @@ impl CommandHandler for RestoreCommand {
             return Ok(());
         }
 
-        // TODO: create a backup before restoring, if not empty
+        if self.undo {
+            let options = UndoRestoreOptions {
+                world_path: context.cwd.join("instance").join(&manifest.name),
+                project_path: context.cwd.clone()
+            };
+
+            ops::backups::undo_restore(context, &options).await?;
+
+            return Ok(());
+        }
 
         let cancel = CancellationToken::new();
         let mut signals = ShutdownSignals::register()?;

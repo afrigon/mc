@@ -186,9 +186,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if !tokio::fs::try_exists(&world_path).await? && tokio::fs::try_exists(&aside_path).await? {
         anyhow::bail!(
-            "an interrupted restore left no world at `{}`; run `mc restore` again, or rename `{}` back to recover the previous world",
-            world_path.display(),
-            aside_path.display()
+            "an interrupted restore left no world at `{}`; run `mc restore` again, or `mc restore --undo` to put the previous world back",
+            world_path.display()
         );
     }
 

@@ -15,8 +15,14 @@ set-aside world is kept until the next restore replaces it.
 A restore killed with no chance to clean up (power loss, SIGKILL) can leave
 no world in place while the set-aside copy still exists. `mc run` refuses
 to start in that state — instead of silently generating a fresh world — and
-explains how to recover: run `mc restore` again, or rename the set-aside
-directory back.
+explains how to recover: run `mc restore` again, or `mc restore --undo` to
+put the previous world back.
+
+## Undoing a restore
+
+`--undo` puts the world set aside by the last restore back in place. When a
+world is currently present the two are swapped — nothing is deleted, and
+undoing again swaps back.
 
 ## Options
 
@@ -26,6 +32,8 @@ directory back.
 - `--backup <BACKUP>` — the backup to restore, by the filename shown by
   `--list`. Defaults to the most recent automatic backup; named backups are
   only restored when passed explicitly.
+- `--undo` — put the world set aside by the last restore back in place,
+  swapping it with the current world.
 - `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
 
 ## Examples
@@ -37,4 +45,5 @@ myserver_2026-07-15_15-00-00.tar.gz (latest)
 myserver_2026-07-14_15-00-00.tar.gz
 $ mc restore
 $ mc restore --backup myserver_pre-update.tar.gz
+$ mc restore --undo
 ```

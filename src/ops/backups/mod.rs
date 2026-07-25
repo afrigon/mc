@@ -525,6 +525,65 @@ pub async fn restore(context: &mut McContext, options: &RestoreOptions) -> McRes
     result
 }
 
+pub struct UndoRestoreOptions {
+    pub project_path: PathBuf,
+    pub world_path: PathBuf
+}
+
+/// Puts the set-aside world from the last restore back in place. When a world
+/// is currently present the two are swapped, so undoing twice returns to the
+/// starting state and nothing is ever deleted.
+pub async fn undo_restore(context: &mut McContext, options: &UndoRestoreOptions) -> McResult<()> {
+    let locks = InstanceLocks::new(&options.project_path);
+
+    let mut world_lock = locks.world()?;
+    let world_guard = world_lock.try_acquire()?.context(
+        "cannot undo a restore while the server is running or another operation owns the world; stop the server first"
+    )?;
+
+    let mut backup_lock = locks.backup()?;
+    let backup_guard = backup_lock
+        .try_acquire()?
+        .context("a backup is in progress; wait for it to finish before undoing a restore")?;
+
+    let aside = options.world_path.with_extension("restore.bak");
+
+    if !tokio::fs::try_exists(&aside).await? {
+        anyhow::bail!(
+            "there is no set-aside world at `{}` to put back",
+            aside.display()
+        );
+    }
+
+    if tokio::fs::try_exists(&options.world_path).await? {
+        let swap = options.world_path.with_extension("restore.swap");
+
+        if tokio::fs::try_exists(&swap).await? {
+            tokio::fs::remove_dir_all(&swap).await?;
+        }
+
+        tokio::fs::rename(&options.world_path, &swap).await?;
+        tokio::fs::rename(&aside, &options.world_path).await?;
+        tokio::fs::rename(&swap, &aside).await?;
+
+        _ = context.shell().status(
+            "Finished",
+            "swapped the world with the set-aside copy; undo again to swap back"
+        );
+    } else {
+        tokio::fs::rename(&aside, &options.world_path).await?;
+
+        _ = context
+            .shell()
+            .status("Finished", "moved the set-aside world back into place");
+    }
+
+    drop(backup_guard);
+    drop(world_guard);
+
+    Ok(())
+}
+
 pub fn connect_rcon(port: u16, password: &str) -> Option<minecraft_client_rs::Client> {
     let rcon_address = format!("127.0.0.1:{}", port);
 
