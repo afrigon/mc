@@ -15,10 +15,10 @@ rest:
 Grab a pre-built binary from the
 [releases page](https://github.com/afrigon/mc/releases), then:
 
-```console
-$ mc init myserver --eula
-$ cd myserver
-$ mc run
+```sh
+mc init myserver --eula
+cd myserver
+mc run
 ```
 
 Passing `--eula` indicates you have read and agree to the
