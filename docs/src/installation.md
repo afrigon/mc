@@ -1,5 +1,14 @@
 # Installation
 
+## mise
+
+[mise](https://mise.jdx.dev) installs the latest release binary and puts it
+on your `PATH`:
+
+```console
+$ mise use -g github:afrigon/mc
+```
+
 ## Pre-built binaries
 
 Every release publishes pre-built binaries on the

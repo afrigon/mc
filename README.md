@@ -12,8 +12,14 @@ rest:
 
 ## Quick start
 
-Grab a pre-built binary from the
-[releases page](https://github.com/afrigon/mc/releases), then:
+Install with [mise](https://mise.jdx.dev):
+
+```sh
+mise use -g github:afrigon/mc
+```
+
+or grab a pre-built binary from the
+[releases page](https://github.com/afrigon/mc/releases). Then:
 
 ```sh
 mc init myserver --eula
