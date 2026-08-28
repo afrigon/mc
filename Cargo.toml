@@ -2,6 +2,7 @@
 name = "mc"
 version = "0.6.2"
 edition = "2024"
+license = "MIT"
 
 [dependencies]
 annotate-snippets = "0.12.10"
