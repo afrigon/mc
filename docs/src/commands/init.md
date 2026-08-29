@@ -4,9 +4,17 @@
 mc init [OPTIONS] [PATH]
 ```
 
-Creates a new instance: a `mc.toml` manifest and the supporting directories.
-`PATH` defaults to the current directory and is created if it does not
-exist. The command refuses to run where a `mc.toml` already exists.
+Creates a new instance: a `mc.toml` manifest, a `.gitignore`, and the
+supporting directories. `PATH` defaults to the current directory and is
+created if it does not exist. The command refuses to run where a `mc.toml`
+already exists.
+
+The generated `.gitignore` excludes runtime state — the installed JDKs and
+Minecraft binaries, the live server directory, scratch space, and run-time
+lock files — so an instance can be versioned with git. The manifest and the
+`mc.lock` lockfile are not excluded: commit them to make the instance
+reproducible. An existing `.gitignore` is left untouched; a warning lists
+any of these entries it lacks.
 
 ## Options
 
