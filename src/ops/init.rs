@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -22,6 +23,46 @@ pub async fn init_directories(
     )?;
 
     Ok(())
+}
+
+const GITIGNORE: &str = "\
+.DS_Store
+
+/.java
+/.minecraft
+/instance
+/temp
+
+/mc.world.lock
+/mc.backup.lock
+";
+
+async fn write_gitignore(context: &mut McContext, path: &Path) -> McResult<()> {
+    let gitignore_path = path.join(".gitignore");
+
+    match tokio::fs::read_to_string(&gitignore_path).await {
+        Ok(existing) => {
+            let existing_entries: HashSet<&str> = existing.lines().map(str::trim).collect();
+            let missing: Vec<&str> = GITIGNORE
+                .lines()
+                .filter(|entry| !entry.is_empty() && !existing_entries.contains(entry))
+                .collect();
+
+            if !missing.is_empty() {
+                context.shell().warn(format!(
+                    ".gitignore already exists and was left untouched, but is missing entries: {}",
+                    missing.join(", ")
+                ))?;
+            }
+
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            tokio::fs::write(&gitignore_path, GITIGNORE).await?;
+            Ok(())
+        }
+        Err(error) => Err(error.into())
+    }
 }
 
 pub struct InitOptions {
@@ -77,6 +118,8 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
         manifest::presets::create_document(context, options.preset, name, options.eula).await?;
 
     tokio::fs::write(toml_path, manifest.to_string()).await?;
+
+    write_gitignore(context, path).await?;
 
     let init_directories_options = InitDirectoriesOptions {
         path: options.path.clone()
