@@ -1,0 +1,13 @@
+[settings]
+lockfile = true
+
+[tools]
+rust = "1.98"
+
+[tasks.build]
+description = "Build in release mode"
+run = "cargo build --release"
+
+[tasks.mc]
+description = "Build and run mc"
+run = "cargo run"
