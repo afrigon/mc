@@ -31,6 +31,11 @@ lithium = "..."
 [backups]
 enabled = true
 frequency = "0 0 * * * *"
+
+[backups.storage]
+type = "local"
+path = "backups"
+keep = 20
 ```
 
 ## `name` (required)
