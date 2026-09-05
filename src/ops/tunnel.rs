@@ -10,6 +10,7 @@ use std::time::Instant;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
+use tokio::process::Child;
 use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -37,6 +38,7 @@ pub const LOG_FILE_NAME: &'static str = "playitd.log";
 const CLAIM_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const CLAIM_TIMEOUT: Duration = Duration::from_secs(600);
 const AGENT_RESTART_DELAY: Duration = Duration::from_secs(5);
+const AGENT_STOP_GRACE: Duration = Duration::from_secs(5);
 const TUNNEL_ALLOCATION_POLL_INTERVAL: Duration = Duration::from_secs(3);
 const TUNNEL_ALLOCATION_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -337,6 +339,28 @@ fn agent_command(options: &TunnelAgentOptions) -> Command {
     command
 }
 
+// The agent shuts down cleanly on SIGINT, telling the relay it is going
+// away; a plain kill leaves the tunnel looking online until its session
+// expires.
+async fn stop_agent(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let interrupted = child
+            .id()
+            .map(|pid| unsafe { libc::kill(pid as libc::pid_t, libc::SIGINT) } == 0)
+            .unwrap_or(false);
+
+        if interrupted {
+            tokio::select! {
+                _ = child.wait() => return,
+                _ = tokio::time::sleep(AGENT_STOP_GRACE) => {}
+            }
+        }
+    }
+
+    let _ = child.kill().await;
+}
+
 fn warn(shell: &Arc<Mutex<Shell>>, message: String) {
     _ = shell
         .lock()
@@ -354,10 +378,10 @@ pub fn supervise(
     tokio::spawn(async move {
         let mut command = agent_command(&options);
 
-        _ = shell.lock().unwrap_or_else(PoisonError::into_inner).status(
-            "Running",
-            format!("`{}`", utils::process::render_command(&command))
-        );
+        _ = shell
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .status("Tunnel", "starting the agent");
 
         loop {
             let mut child = match command.spawn() {
@@ -373,7 +397,7 @@ pub fn supervise(
 
             tokio::select! {
                 _ = cancel.cancelled() => {
-                    let _ = child.kill().await;
+                    stop_agent(&mut child).await;
                     return;
                 }
                 status = child.wait() => {

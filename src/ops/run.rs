@@ -561,7 +561,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     if let Some(tunnel_handle) = tunnel_handle {
         let _ = tunnel_handle.await;
 
-        _ = context.shell().status("Stopped", "the tunnel agent");
+        _ = context.shell().status("Tunnel", "stopped the agent");
     }
 
     if let Some(ref notifier) = notifier {
