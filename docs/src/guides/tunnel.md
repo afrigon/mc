@@ -13,13 +13,14 @@ agent is claimed.
 
 ## Enabling a tunnel
 
-```toml
-[tunnel]
-provider = "playit"
+```kdl
+tunnel {
+    provider "playit"
+}
 ```
 
-Adding the section is enough; see
-[`[tunnel]`](../reference/manifest.md#tunnel) for its keys.
+Adding the section is enough — a bare `tunnel` node also works; see
+[`tunnel`](../reference/manifest.md#tunnel) for its keys.
 
 ## First start
 

@@ -82,9 +82,9 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
 
     context.shell().status("Creating", "Minecraft instance")?;
 
-    let toml_path = path.join("mc.toml");
+    let manifest_path = path.join("mc.kdl");
 
-    if toml_path.exists() {
+    if manifest_path.exists() {
         anyhow::bail!("`mc init` cannot be run on existing mc instance")
     }
 
@@ -95,17 +95,17 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
     if !options.eula {
         context
             .shell()
-            .warn("the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in the server section of `mc.toml`")?;
+            .warn("the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula #true` in the server section of `mc.kdl`")?;
     }
 
     let manifest =
         manifest::presets::create_document(context, options.preset, name, options.eula).await?;
 
-    tokio::fs::write(toml_path, manifest.to_string()).await?;
+    tokio::fs::write(manifest_path, manifest.to_string()).await?;
 
     write_gitignore(context, path).await?;
 
-    context.shell().note("see more `mc.toml` keys and their definitions at https://doc.mc.frigon.app/reference/manifest.html")?;
+    context.shell().note("see more `mc.kdl` keys and their definitions at https://doc.mc.frigon.app/reference/manifest.html")?;
 
     Ok(())
 }

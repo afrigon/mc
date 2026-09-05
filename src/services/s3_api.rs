@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use aws_config::BehaviorVersion;
+use aws_config::Region;
 use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use url::Url;
@@ -11,9 +12,20 @@ use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
 use crate::utils::errors::McResult;
 
-pub async fn upload(bucket: &str, key: &str, path: PathBuf) -> McResult<()> {
-    let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
-    let s3_client = aws_sdk_s3::Client::new(&config);
+/// A client on the standard AWS credential chain, with `region` overriding
+/// the chain's region when set.
+async fn client(region: Option<&str>) -> aws_sdk_s3::Client {
+    let mut loader = aws_config::defaults(BehaviorVersion::latest());
+
+    if let Some(region) = region {
+        loader = loader.region(Region::new(region.to_owned()));
+    }
+
+    aws_sdk_s3::Client::new(&loader.load().await)
+}
+
+pub async fn upload(bucket: &str, region: Option<&str>, key: &str, path: PathBuf) -> McResult<()> {
+    let s3_client = client(region).await;
 
     let body = ByteStream::from_path(&path)
         .await
@@ -33,11 +45,11 @@ pub async fn upload(bucket: &str, key: &str, path: PathBuf) -> McResult<()> {
 
 pub async fn artifact_source(
     bucket: &str,
+    region: Option<&str>,
     key: &str,
     version: Option<&str>
 ) -> McResult<ArtifactSource> {
-    let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
-    let s3_client = aws_sdk_s3::Client::new(&config);
+    let s3_client = client(region).await;
 
     let presigning_config = PresigningConfig::expires_in(Duration::from_mins(1))?;
 
@@ -70,9 +82,8 @@ pub async fn artifact_source(
 
 /// List every object key in the (backup-dedicated) bucket, paginating until
 /// exhausted.
-pub async fn list_keys(bucket: &str) -> McResult<Vec<String>> {
-    let config = aws_config::defaults(BehaviorVersion::latest()).load().await;
-    let s3_client = aws_sdk_s3::Client::new(&config);
+pub async fn list_keys(bucket: &str, region: Option<&str>) -> McResult<Vec<String>> {
+    let s3_client = client(region).await;
 
     let mut keys = Vec::new();
     let mut continuation_token = None;

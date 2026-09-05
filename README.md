@@ -2,7 +2,7 @@
 
 **mc** is a command line tool to manage and run Minecraft instances.
 
-Describe your server in a single `mc.toml` manifest; mc takes care of the
+Describe your server in a single `mc.kdl` manifest; mc takes care of the
 rest:
 
 - installs a Java runtime, the Minecraft binary, a mod loader, and mods

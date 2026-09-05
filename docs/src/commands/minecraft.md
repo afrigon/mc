@@ -43,7 +43,7 @@ mc minecraft install [OPTIONS] [VERSION]
 ```
 
 Downloads a Minecraft binary into the instance's `.minecraft` directory.
-`VERSION` accepts the same values as `[minecraft] version` in the manifest
+`VERSION` accepts the same values as `version` under `minecraft` in the manifest
 (`latest`, `latest-snapshot`, or an exact version id) and defaults to
 `latest`. Fails if that version is already installed.
 

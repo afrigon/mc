@@ -34,7 +34,7 @@ undoing again swaps back.
   only restored when passed explicitly.
 - `--undo` — put the world set aside by the last restore back in place,
   swapping it with the current world.
-- `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 
 ## Examples
 

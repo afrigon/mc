@@ -1,9 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use serde::Deserialize;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ModServiceKind {
     Modrinth
 }

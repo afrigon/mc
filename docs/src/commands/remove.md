@@ -4,7 +4,7 @@
 mc remove [OPTIONS] <MOD_SLUG>...
 ```
 
-Removes mods from the `[mods]` table of the manifest. A slug that is not in
+Removes mods from the manifest's `mods` block, whichever group lists them. A slug that is not in
 the manifest is reported and skipped.
 
 The jars are uninstalled the next time the instance starts. A removed mod's
@@ -13,7 +13,7 @@ lockfile and is uninstalled along with it.
 
 ## Options
 
-- `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 
 ## Examples
 

@@ -11,7 +11,7 @@ mc tunnel list [OPTIONS]
 ```
 
 Lists the tunnel agent versions mc can install, most recent first. The one
-marked `(latest)` is what `[tunnel] provider` resolves to when its version
+marked `(latest)` is what `provider` under `tunnel` resolves to when its version
 half is omitted or set to `latest`.
 
 ```console
@@ -32,7 +32,7 @@ mc tunnel install [OPTIONS] [PROVIDER]
 ```
 
 Downloads a tunnel agent into the instance's `.tunnel` directory. `PROVIDER`
-accepts the same values as `[tunnel] provider` in the manifest, a `name` or
+accepts the same values as `provider` under `tunnel` in the manifest, a `name` or
 `name@version` descriptor, and defaults to `playit`. Fails if that version is
 already installed.
 

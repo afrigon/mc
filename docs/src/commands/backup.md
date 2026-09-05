@@ -4,8 +4,8 @@
 mc backup [OPTIONS]
 ```
 
-Archives the world and stores it in the storage target configured under
-`[backups.storage]` — see [Backups](../guides/backups.md). Works whether or
+Archives the world and stores it in the storage target configured in the
+`backups` section — see [Backups](../guides/backups.md). Works whether or
 not scheduled backups are enabled.
 
 The instance may be stopped or running. A running instance is reached over
@@ -38,7 +38,7 @@ run.
 
 - `--name <NAME>` — store the backup under a name and keep it forever
   instead of timestamping it and rotating it out.
-- `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 
 ## Examples
 

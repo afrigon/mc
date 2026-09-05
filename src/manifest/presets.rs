@@ -2,12 +2,10 @@ use std::convert::Infallible;
 use std::str::FromStr;
 
 use clap::ValueEnum;
-use toml_edit::DocumentMut;
-use toml_edit::Item;
-use toml_edit::Table;
-use toml_edit::value;
+use kdl::KdlDocument;
 
 use crate::context::McContext;
+use crate::manifest::document;
 use crate::mods::loader::LoaderKind;
 use crate::services;
 use crate::utils;
@@ -37,10 +35,11 @@ pub async fn create_document(
     preset: ManifestPreset,
     name: &str,
     eula: bool
-) -> McResult<DocumentMut> {
+) -> McResult<KdlDocument> {
     let game_version = services::minecraft_api::get_latest_version(&context.http_client).await?;
 
-    let mut document = create_document_base(name, eula, &game_version);
+    let mut document =
+        create_document_base(name, eula, &game_version, preset != ManifestPreset::Vanilla);
 
     let mods = match preset {
         ManifestPreset::Vanilla => vec![],
@@ -48,20 +47,16 @@ pub async fn create_document(
         ManifestPreset::Technical => get_technical_modlist()
     };
 
-    if !mods.is_empty() {
-        document["minecraft"]["loader"] = value("fabric");
+    for m in mods {
+        let version = services::modrinth_api::get_latest_version(
+            &context.http_client,
+            &String::from(m),
+            LoaderKind::Fabric,
+            &game_version
+        )
+        .await?;
 
-        for m in mods {
-            let version = services::modrinth_api::get_latest_version(
-                &context.http_client,
-                &String::from(m),
-                LoaderKind::Fabric,
-                &game_version
-            )
-            .await?;
-
-            document["mods"][m] = value(version.id);
-        }
+        document::set_mod_version(&mut document, m, &version.id)?;
     }
 
     Ok(document)
@@ -83,39 +78,69 @@ fn get_technical_modlist() -> Vec<&'static str> {
     ]
 }
 
-fn create_document_base(name: &str, eula: bool, game_version: &String) -> DocumentMut {
-    let mut document = DocumentMut::new();
-    document["name"] = value(name);
-    document["description"] = value("A Minecraft Server");
+pub(super) fn create_document_base(
+    name: &str,
+    eula: bool,
+    game_version: &str,
+    with_loader: bool
+) -> KdlDocument {
+    let mut document = KdlDocument::new();
+    let nodes = document.nodes_mut();
 
-    // [minecraft]
-    let mut minecraft = Table::new();
-    minecraft["version"] = value(game_version);
-    document["minecraft"] = Item::Table(minecraft);
+    nodes.push(utils::kdl::leaf("name", utils::kdl::quoted(name), 0));
+    nodes.push(utils::kdl::leaf(
+        "description",
+        utils::kdl::quoted("A Minecraft Server"),
+        0
+    ));
 
-    // [server]
-    let mut server = Table::new();
-    server["gamemode"] = value("survival");
-    server["difficulty"] = value("normal");
-    server["hardcore"] = value(false);
-    server["eula"] = value(eula);
-    utils::toml::set_comment(
-        &mut server,
-        "eula",
-        vec![
+    let mut minecraft = utils::kdl::node("minecraft", 0);
+    utils::kdl::add_blank_line_before(&mut minecraft);
+    minecraft
+        .ensure_children()
+        .nodes_mut()
+        .push(utils::kdl::leaf(
+            "version",
+            utils::kdl::quoted(game_version),
+            1
+        ));
+
+    if with_loader {
+        minecraft
+            .ensure_children()
+            .nodes_mut()
+            .push(utils::kdl::leaf("loader", utils::kdl::quoted("fabric"), 1));
+    }
+
+    nodes.push(minecraft);
+
+    let mut server = utils::kdl::node("server", 0);
+    utils::kdl::add_blank_line_before(&mut server);
+
+    let mut eula_node = utils::kdl::leaf("eula", eula, 1);
+    utils::kdl::set_comment(
+        &mut eula_node,
+        &[
             "Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).",
-            "This agreement is between you and Mojang/Microsoft.",
+            "This agreement is between you and Mojang/Microsoft."
         ]
     );
-    document["server"] = Item::Table(server);
 
-    // [backups]
-    document["backups"] = Item::Table(Table::new());
-    document["backups"]["enabled"] = value(true);
-    document["backups"]["frequency"] = value("0 0 * * * *");
+    server.ensure_children().nodes_mut().extend([
+        utils::kdl::leaf("gamemode", utils::kdl::quoted("survival"), 1),
+        utils::kdl::leaf("difficulty", utils::kdl::quoted("normal"), 1),
+        utils::kdl::leaf("hardcore", false, 1),
+        eula_node
+    ]);
+    nodes.push(server);
 
-    // [mods]
-    document["mods"] = toml_edit::Item::Table(toml_edit::Table::new());
+    let mut backups = utils::kdl::node("backups", 0);
+    utils::kdl::add_blank_line_before(&mut backups);
+    backups.ensure_children().nodes_mut().extend([
+        utils::kdl::node("on", 1),
+        utils::kdl::leaf("frequency", utils::kdl::quoted("0 0 * * * *"), 1)
+    ]);
+    nodes.push(backups);
 
     document
 }

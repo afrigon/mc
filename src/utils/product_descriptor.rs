@@ -1,8 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 
-use serde::Deserialize;
-
 use crate::context::McContext;
 use crate::utils::errors::McResult;
 
@@ -32,17 +30,6 @@ impl FromStr for RawProductDescriptor {
             product: product.to_owned(),
             version: version.map(|v| v.to_owned())
         })
-    }
-}
-
-impl<'de> Deserialize<'de> for RawProductDescriptor {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>
-    {
-        let s = String::deserialize(deserializer)?;
-
-        s.parse().map_err(serde::de::Error::custom)
     }
 }
 

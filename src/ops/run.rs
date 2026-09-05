@@ -81,16 +81,16 @@ fn has_jvm_property(arguments: &[String], property: &str) -> bool {
 
 // TODO: validate error context for all cases.
 // - invalid versions
-// - invalid toml format
-// - missing toml file
+// - invalid manifest format
+// - missing manifest file
 // - etc.
 /// Returns the server's exit status when it exits on its own; `None` when the
 /// shutdown was requested by a signal.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Option<ExitStatus>> {
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
-        .context("could not find mc.toml file")?;
-    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
+        .context("could not find mc.kdl file")?;
+    let manifest = Manifest::from_kdl_str(&manifest_string)?;
 
     let path = context.cwd.clone();
     let instance_path = path.join("instance");
@@ -130,7 +130,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if !manifest.server.eula {
         anyhow::bail!(
-            "the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula = true` in `mc.toml`"
+            "the instance will not start until YOU agree to the Minecraft EULA (https://aka.ms/MinecraftEULA). you can do so by setting `eula #true` in the server section of `mc.kdl`"
         );
     }
 
@@ -218,7 +218,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     for key in property_overrides.keys() {
         if managed_entries.contains_key(key) {
             _ = context.shell().warn(format!(
-                "the `{}` entry under [server.properties] conflicts with a value managed through the manifest and was ignored",
+                "the `{}` entry in the `properties` block of `server` conflicts with a value managed through the manifest and was ignored",
                 key
             ));
         }
@@ -226,7 +226,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if property_overrides.contains_key("enable-rcon") {
         _ = context.shell().warn(
-            "the `enable-rcon` entry under [server.properties] was ignored; rcon is enabled when a rcon password is configured"
+            "the `enable-rcon` entry in the `properties` block of `server` was ignored; rcon is enabled when a rcon password is configured"
         );
     }
 

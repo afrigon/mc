@@ -19,7 +19,7 @@ is hidden unless `--server-logs` is passed; it is always written to
 `instance/logs/` by the server itself. The console is not interactive; use
 the remote console (RCON) for live administration.
 
-With a `[tunnel]` section, the tunnel agent starts beside the instance and
+With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
 goes to `.tunnel/playitd.log` otherwise. The first start from a terminal prints a claim link to approve in a
@@ -49,7 +49,7 @@ instance's exit code.
 
 ## Options
 
-- `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 - `--server-logs` — show the instance's console output in the terminal.
 - `--tunnel-logs` — show the tunnel agent's output in the terminal.

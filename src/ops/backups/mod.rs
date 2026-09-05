@@ -11,7 +11,6 @@ use std::sync::PoisonError;
 use anyhow::Context;
 use chrono::NaiveDateTime;
 use minecraft_client_rs::Client;
-use serde::Deserialize;
 use tempfile::NamedTempFile;
 use tokio_util::sync::CancellationToken;
 
@@ -56,13 +55,11 @@ pub enum Backend {
 impl Backend {
     pub fn from_storage(storage: &BackupStorage, world_name: &str) -> McResult<Backend> {
         let backend = match storage {
-            BackupStorage::S3 { bucket } => {
-                let bucket = bucket.clone().context(
-                    "no S3 bucket is configured; set `bucket` under `[backups.storage]` in mc.toml or the MC_BACKUPS_S3_BUCKET environment variable"
-                )?;
-
-                Backend::S3(S3BackupBackend::new(bucket, world_name.to_string()))
-            }
+            BackupStorage::S3 { bucket, region } => Backend::S3(S3BackupBackend::new(
+                bucket.clone(),
+                region.clone(),
+                world_name.to_string()
+            )),
             BackupStorage::Local { path, keep } => {
                 if *keep == 0 {
                     anyhow::bail!(
@@ -154,23 +151,17 @@ fn validate_backup_name(name: &str) -> McResult<()> {
     Ok(())
 }
 
-fn default_keep() -> usize {
-    20
-}
-
-#[derive(Deserialize, Clone)]
-#[serde(tag = "type", rename_all = "lowercase")]
+#[derive(Clone)]
 pub enum BackupStorage {
     S3 {
-        /// May be omitted in `mc.toml` and supplied via `MC_BACKUPS_S3_BUCKET`.
-        #[serde(default)]
-        bucket: Option<String>
+        /// `MC_BACKUPS_S3_BUCKET` overrides the manifest value.
+        bucket: String,
+        region: Option<String>
     },
     Local {
         path: PathBuf,
 
         /// Keep only this many most-recent backups, pruning older ones.
-        #[serde(default = "default_keep")]
         keep: usize
     }
 }

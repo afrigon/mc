@@ -1,41 +1,47 @@
 # The Manifest Format
 
-The `mc.toml` manifest at the root of an instance describes everything about
-it. It is written in [TOML](https://toml.io). Every section except the two
+The `mc.kdl` manifest at the root of an instance describes everything about
+it. It is written in [KDL](https://kdl.dev). Every section except the two
 top-level keys is optional; omitted keys take the defaults listed below.
+Unknown keys, repeated keys, and stray values are errors.
 
-```toml
-name = "myserver"
-description = "A Minecraft Server"
+```kdl
+name "myserver"
+description "A Minecraft Server"
 
-[java]
-version = "graal@25"
-min_memory = 4096
-max_memory = 4096
+java {
+    version "graal@25"
+    min-memory 4096
+    max-memory 4096
+}
 
-[minecraft]
-version = "..."
-loader = "fabric"
+minecraft {
+    version "..."
+    loader "fabric"
+}
 
-[server]
-gamemode = "survival"
-difficulty = "normal"
-eula = true
+server {
+    gamemode "survival"
+    difficulty "normal"
+    eula #true
 
-[server.properties]
-white-list = false
+    properties {
+        white-list #false
+    }
+}
 
-[mods]
-lithium = "..."
+mods {
+    modrinth {
+        lithium "..."
+    }
+}
 
-[backups]
-enabled = true
-frequency = "0 0 * * * *"
-
-[backups.storage]
-type = "local"
-path = "backups"
-keep = 20
+backups {
+    on
+    frequency "0 0 * * * *"
+    keep 20
+    local "backups"
+}
 ```
 
 ## `name` (required)
@@ -48,7 +54,7 @@ used as the world's `level-name`. Must be usable as a directory name.
 A short description, used as the message of the day (`motd`) shown in the
 multiplayer list.
 
-## `[java]`
+## `java`
 
 The Java runtime used to launch the instance.
 
@@ -56,20 +62,21 @@ The Java runtime used to launch the instance.
   descriptor. Defaults to `"graal@25"`. Run
   [`mc java list`](../commands/java.md) to see the available runtimes; the
   one marked `(recommended)` is the default.
-- `min_memory` — initial heap size in megabytes. Defaults to `4096`.
-- `max_memory` — maximum heap size in megabytes. Defaults to `4096`.
-- `jvm_arguments` — extra arguments passed to the JVM. Defaults to a small
+- `min-memory` — initial heap size in megabytes. Defaults to `4096`.
+- `max-memory` — maximum heap size in megabytes. Defaults to `4096`.
+- `jvm-arguments` — extra arguments passed to the JVM. Defaults to a small
   set of tuned flags; setting this key replaces the defaults entirely.
 
-```toml
-[java]
-version = "graal@25"
-min_memory = 8192
-max_memory = 8192
-jvm_arguments = ["-XX:+AlwaysPreTouch"]
+```kdl
+java {
+    version "graal@25"
+    min-memory 8192
+    max-memory 8192
+    jvm-arguments "-XX:+AlwaysPreTouch"
+}
 ```
 
-## `[minecraft]`
+## `minecraft`
 
 The Minecraft version and mod loader.
 
@@ -82,15 +89,16 @@ The Minecraft version and mod loader.
 - `loader` — the mod loader, as a `name` or `name@version` descriptor
   (for example `"fabric"`, which resolves to the latest loader version for
   the configured Minecraft version). When omitted, the instance runs without
-  a loader and the `[mods]` table is ignored. Run
+  a loader and the `mods` block is ignored. Run
   [`mc minecraft list-loaders`](../commands/minecraft.md) to see loader
   versions.
 
-## `[tunnel]`
+## `tunnel`
 
 Exposes the instance to players outside the local network through a tunnel
 provider; see the [Tunnels](../guides/tunnel.md) guide. The section is
-opt-in: when it is absent, no tunnel agent is installed or started.
+opt-in: when it is absent, no tunnel agent is installed or started. A bare
+`tunnel` node enables it with the defaults.
 
 - `provider` — the tunnel provider, as a `name` or `name@version`
   descriptor. `playit` is the accepted provider. Defaults to `"playit"`,
@@ -98,57 +106,62 @@ opt-in: when it is absent, no tunnel agent is installed or started.
   version, such as `"playit@1.0.10"`, to hold it. Run
   [`mc tunnel list`](../commands/tunnel.md) to see the available versions.
 
-```toml
-[tunnel]
-provider = "playit"
+```kdl
+tunnel {
+    provider "playit"
+}
 ```
 
-## `[server]`
+## `server`
 
 Settings mc manages for the server. Each maps to a `server.properties` key,
 listed in parentheses; because these are managed here, they cannot be set
-through `[server.properties]`.
+through `properties`.
 
 - `gamemode` — `"survival"`, `"creative"`, `"adventure"`, or `"spectator"`.
   Defaults to `"survival"`. (`gamemode`)
 - `difficulty` — `"peaceful"`, `"easy"`, `"normal"`, or `"hard"`. Defaults
   to `"normal"`. (`difficulty`)
-- `level_type` — `"minecraft:normal"`, `"minecraft:flat"`,
+- `level-type` — `"minecraft:normal"`, `"minecraft:flat"`,
   `"minecraft:large_biomes"`, `"minecraft:amplified"`, or
   `"minecraft:single_biome_surface"`. Defaults to `"minecraft:normal"`.
   (`level-type`)
-- `hardcore` — defaults to `false`. (`hardcore`)
+- `hardcore` — defaults to `#false`. (`hardcore`)
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the
   [Minecraft EULA](https://aka.ms/MinecraftEULA). The instance refuses to
-  start until this is `true`. Defaults to `false`.
+  start until this is `#true`. Defaults to `#false`.
 - `ip` — the address to bind. When omitted, the server binds all addresses,
   IPv6 included. (`server-ip`)
 - `port` — the game port. Defaults to `25565`. (`server-port`)
-- `rcon_port` — the remote console port. Defaults to `25575`. (`rcon.port`)
+- `rcon-port` — the remote console port. Defaults to `25575`. (`rcon.port`)
 - `capacity` — the maximum number of players. Defaults to `20`.
   (`max-players`)
-- `view_distance` — in chunks. Defaults to `16`. (`view-distance`)
-- `simulation_distance` — in chunks. Defaults to `16`.
+- `view-distance` — in chunks. Defaults to `16`. (`view-distance`)
+- `simulation-distance` — in chunks. Defaults to `16`.
   (`simulation-distance`)
 
-## `[server.properties]`
+### `properties`
 
-Overrides for any other
+A block inside `server` holding overrides for any other
 [`server.properties`](https://minecraft.wiki/w/Server.properties) key. mc
 generates the file on every start — hand edits do not survive — so this
-table is the way to reach settings that have no `[server]` field:
+block is the way to reach settings that have no `server` field:
 
-```toml
-[server.properties]
-white-list = false
-spawn-protection = 16
-"query.port" = 25565
+```kdl
+server {
+    properties {
+        white-list #false
+        spawn-protection 16
+        "query.port" 25565
+    }
+}
 ```
 
 Values may be strings, integers, floats, or booleans. Keys containing a dot
-must be quoted, as above.
+must be quoted, as above; a nested block spells the same key, so
+`rcon { broadcast "yes" }` sets `rcon.broadcast`.
 
 Keys managed by mc take precedence: an entry that conflicts with a value
 derived from the manifest or the environment is ignored with a warning.
@@ -160,84 +173,94 @@ Note two defaults that differ from a vanilla server: the allow list is
 enabled (`white-list`), and the server binds all addresses, IPv6 included
 (`server-ip`).
 
-## `[mods]`
+## `mods`
 
-The mods to install, keyed by the mod's identifier (slug) on the mod
-registry. Three forms are supported:
+The mods to install, grouped by where they come from. Inside a group, each
+node is named after the mod and carries where to fetch it:
 
-```toml
-[mods]
-# a version identifier on the registry
-lithium = "..."
+```kdl
+mods {
+    // mods from the registry, pinned to a version identifier
+    modrinth {
+        lithium "..."
+        carpet "..."
+    }
 
-# the same, spelled out
-carpet = { version = "...", service = "modrinth" }
-
-# a jar fetched from a URL, for mods not on the registry
-my-mod = { url = "https://example.com/my-mod.jar" }
+    // jars fetched from a URL, for mods not on the registry
+    http {
+        my-mod "https://example.com/my-mod.jar"
+    }
+}
 ```
 
-`service` names the registry hosting the mod and defaults to `"modrinth"`.
+`modrinth` maps a mod's identifier (slug) on the registry to the version
+identifier to install. `http` maps a name of your choosing to the URL of a
+jar. A name may appear in only one group; it becomes the jar's filename.
 
 [`mc add`](../commands/add.md), [`mc remove`](../commands/remove.md), and
-[`mc update`](../commands/update.md) edit this table for you and pin
-compatible versions. Required dependencies are resolved automatically when
-the instance starts and recorded in the `mc.lock` lockfile — see
+[`mc update`](../commands/update.md) edit the `modrinth` group for you and
+pin compatible versions. Required dependencies are resolved automatically
+when the instance starts and recorded in the `mc.lock` lockfile — see
 [Managing Mods](../guides/mods.md).
 
-## `[backups]`
+## `backups`
 
 Scheduled world backups, taken while the instance runs.
 
-- `enabled` — schedule backups while the instance runs. Defaults to
-  `false`. Manual [`mc backup`](../commands/backup.md) works regardless.
+- `on` — a bare flag: when present, backups run on the `frequency` schedule
+  while the instance runs. Comment it out or remove it to disable the
+  schedule. Manual [`mc backup`](../commands/backup.md) works regardless.
 - `frequency` — a cron expression with six fields: seconds, minutes, hours,
   day of month, month, day of week. Defaults to `"0 0 * * * *"` (hourly).
-- `storage` — where archives are stored; see below. When the table is
-  omitted, archives go to local storage under `backups`, keeping the 20 most
-  recent.
+- `keep` — the number of most-recent automatic archives to keep in local
+  storage; older ones are pruned. Defaults to `20`. S3 storage is never
+  pruned.
+- `local` — the directory archives are stored in. This is the default
+  storage, under `backups`, when neither `local` nor `s3` is written.
+- `s3` — the bucket archives are uploaded to, with an optional `region`
+  property. Credentials come from the standard AWS credential chain, and
+  `MC_BACKUPS_S3_BUCKET` overrides the bucket. Without `region`, the region
+  also comes from the credential chain.
 
-### `[backups.storage]`
+Write at most one of `local` and `s3`.
 
-Where archives are stored. `type` selects the backend:
-
-```toml
-[backups.storage]
-type = "local"
-path = "backups"    # required once the table is written
-keep = 20           # most-recent archives to keep; default
+```kdl
+backups {
+    on
+    frequency "0 0 * * * *"
+    keep 20
+    local "/mnt/data/mc"
+}
 ```
 
-```toml
-[backups.storage]
-type = "s3"
-bucket = "my-minecraft-backups"
+```kdl
+backups {
+    on
+    s3 "my-minecraft-backups" region="us-east-1"
+}
 ```
-
-For `s3`, the bucket may also come from the `MC_BACKUPS_S3_BUCKET`
-environment variable, and credentials come from the standard AWS credential
-chain. The default is local storage.
 
 See the [Backups](../guides/backups.md) guide for the full picture.
 
-## `[notifications]`
+## `notifications`
 
 Webhook notifications about the instance. A provider is activated by
 setting its webhook environment variable (`MC_DISCORD_WEBHOOK` for
 Discord) — the URL is a secret and is never read from the manifest, and
-without one no notifications are sent. This table selects which events are
-reported; every key defaults to `true`:
+without one no notifications are sent. This block selects which events are
+reported; every key defaults to `#true`:
 
-- `on_lifecycle_event` — the instance started or stopped. When a tunnel is
+- `on-lifecycle-event` — the instance started or stopped. When a tunnel is
   configured, the started message includes the address to join at.
-- `on_panic` — the instance crashed.
-- `on_sigkill` — the instance was forced down without a clean save, because
+- `on-panic` — the instance crashed.
+- `on-sigkill` — the instance was forced down without a clean save, because
   it did not stop within the grace period or a second stop signal arrived.
-- `on_backup` — a backup completed.
-- `on_backup_failure` — a backup failed.
+- `on-backup` — a backup completed.
+- `on-backup-failure` — a backup failed.
 
-```toml
-[notifications]
-on_lifecycle_event = false
-on_backup = false
+```kdl
+notifications {
+    on-lifecycle-event #false
+    on-backup #false
+}
 ```

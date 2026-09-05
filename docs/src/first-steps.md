@@ -4,7 +4,7 @@ This walkthrough creates a new instance and runs it.
 
 ## Create an instance
 
-Each instance lives in its own directory, with a `mc.toml` manifest at its
+Each instance lives in its own directory, with a `mc.kdl` manifest at its
 root. [`mc init`](./commands/init.md) creates both:
 
 ```console
@@ -14,27 +14,35 @@ $ cd myserver
 
 The generated manifest looks like this:
 
-```toml
-name = "myserver"
-description = "A Minecraft Server"
+```kdl
+name "myserver"
+description "A Minecraft Server"
 
-[minecraft]
-version = "..."
+minecraft {
+    version "..."
+    loader "fabric"
+}
 
-[server]
-gamemode = "survival"
-difficulty = "normal"
-hardcore = false
-# Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).
-# This agreement is between you and Mojang/Microsoft.
-eula = false
+server {
+    gamemode "survival"
+    difficulty "normal"
+    hardcore #false
 
-[backups]
-enabled = true
-frequency = "0 0 * * * *"
+    // Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).
+    // This agreement is between you and Mojang/Microsoft.
+    eula #false
+}
 
-[mods]
-lithium = "..."
+backups {
+    on
+    frequency "0 0 * * * *"
+}
+
+mods {
+    modrinth {
+        lithium "..."
+    }
+}
 ```
 
 By default `mc init` uses the `optimized` preset, which adds a mod loader and
@@ -47,9 +55,10 @@ instance. The manifest is yours to edit; every key is documented in
 The instance will not start until you have agreed to the
 [Minecraft EULA](https://aka.ms/MinecraftEULA). Once you have read it, set:
 
-```toml
-[server]
-eula = true
+```kdl
+server {
+    eula #true
+}
 ```
 
 You can also pass `--eula` to `mc init` to do this at creation time.
@@ -69,7 +78,7 @@ mc asks it to save the world and waits for it to exit cleanly.
 
 Note that the allow list is enabled by default, so players must be on it
 before they can join. To open the instance to everyone instead, set
-`white-list = false` under `[server.properties]` in the manifest.
+`white-list #false` in the `properties` block of the `server` section.
 
 ## Next steps
 

@@ -7,13 +7,14 @@ consistent, even under load.
 
 ## Scheduled backups
 
-```toml
-[backups]
-enabled = true
-frequency = "0 0 * * * *"
+```kdl
+backups {
+    on
+    frequency "0 0 * * * *"
+}
 ```
 
-With `enabled = true`, backups fire on the `frequency` schedule while the
+With `on` present, backups fire on the `frequency` schedule while the
 instance runs. `frequency` is a cron expression with six fields — seconds,
 minutes, hours, day of month, month, day of week. The example above backs up
 at the start of every hour.
@@ -29,7 +30,7 @@ password yourself.
 
 A backup can be taken at any time with
 [`mc backup`](../commands/backup.md), even when scheduled backups are
-disabled — `enabled` only controls the schedule. It works against a stopped
+disabled — `on` only controls the schedule. It works against a stopped
 instance, and against a running one as long as the instance was started with
 an RCON password configured (always the case when backups are enabled). When
 the instance is running but cannot be reached, mc refuses to back up rather
@@ -50,17 +51,18 @@ connections.
 
 ## Storage
 
-Archives go to a storage target configured under `[backups.storage]`. Two
-types are supported.
+Archives go to the storage target named in the `backups` section: `local`
+or `s3`, never both. When neither is written, archives go to the `backups`
+directory of the instance.
 
-**Local** (the default) stores archives in a directory and keeps only the
-`keep` most recent automatic ones:
+**Local** stores archives in a directory and keeps only the `keep` most
+recent automatic ones:
 
-```toml
-[backups.storage]
-type = "local"
-path = "backups"
-keep = 20
+```kdl
+backups {
+    keep 20
+    local "/mnt/data/mc"
+}
 ```
 
 Archives appear in the directory atomically: an interrupted backup never
@@ -69,15 +71,15 @@ about to replace.
 
 **S3** uploads archives to a bucket:
 
-```toml
-[backups.storage]
-type = "s3"
-bucket = "my-minecraft-backups"
+```kdl
+backups {
+    s3 "my-minecraft-backups" region="us-east-1"
+}
 ```
 
 Credentials come from the standard AWS credential chain (environment,
-`~/.aws`, or an IAM role). The bucket can also be supplied with the
-`MC_BACKUPS_S3_BUCKET` environment variable instead of the manifest. mc does
+`~/.aws`, or an IAM role), and so does the region when `region` is omitted.
+The `MC_BACKUPS_S3_BUCKET` environment variable overrides the bucket. mc does
 not prune S3 backups; use a bucket lifecycle rule to expire old archives.
 
 Give each instance its own bucket or directory. mc treats a file in the
@@ -106,7 +108,7 @@ prefix) if named backups must outlive it.
 
 mc reports backup results — along with other instance events — to a webhook
 when one is configured through the environment (`MC_DISCORD_WEBHOOK` for
-Discord). The `[notifications]` section of the manifest selects which
+Discord). The `notifications` section of the manifest selects which
 events are sent; see
 [The Manifest Format](../reference/manifest.md#notifications). A failed
 notification never fails the backup itself.
