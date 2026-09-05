@@ -32,6 +32,7 @@ use crate::utils::errors::McResult;
 use crate::utils::shell::Shell;
 
 pub const SECRET_FILE_NAME: &'static str = "playit.toml";
+pub const LOG_FILE_NAME: &'static str = "playitd.log";
 
 const CLAIM_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const CLAIM_TIMEOUT: Duration = Duration::from_secs(600);
@@ -306,7 +307,8 @@ pub struct TunnelAgentOptions {
     pub agent_path: PathBuf,
     pub work_directory: PathBuf,
     pub socket_path: String,
-    pub log_level: &'static str
+    pub log_level: &'static str,
+    pub logs: bool
 }
 
 fn agent_command(options: &TunnelAgentOptions) -> Command {
@@ -323,6 +325,12 @@ fn agent_command(options: &TunnelAgentOptions) -> Command {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .kill_on_drop(true);
+
+    // The agent logs to stderr unless given a log file, so hidden output is
+    // kept on disk rather than dropped.
+    if !options.logs {
+        command.arg("--log-path").arg(LOG_FILE_NAME);
+    }
 
     utils::process::detach_from_terminal_signals(&mut command);
 

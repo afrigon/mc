@@ -51,7 +51,17 @@ const SECRET_PROPERTY_KEYS: [&str; 3] = [
 
 pub struct RunOptions {
     pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf
+    pub lockfile_path: PathBuf,
+    pub server_logs: bool,
+    pub tunnel_logs: bool
+}
+
+fn child_output(shown: bool) -> Stdio {
+    if shown {
+        Stdio::inherit()
+    } else {
+        Stdio::null()
+    }
 }
 
 fn has_jvm_property(arguments: &[String], property: &str) -> bool {
@@ -328,7 +338,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             agent_path,
             work_directory: tunnel_directory,
             socket_path: ops::tunnel::socket_path(&manifest.name),
-            log_level: server_log_level
+            log_level: server_log_level,
+            logs: options.tunnel_logs
         });
     }
 
@@ -362,8 +373,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .arg("--nogui")
         .current_dir(&instance_path)
         .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stdout(child_output(options.server_logs))
+        .stderr(child_output(options.server_logs))
         .kill_on_drop(true);
 
     utils::process::detach_from_terminal_signals(&mut command);

@@ -10,7 +10,8 @@ myserver/
 ├── .java/
 ├── .minecraft/
 ├── .tunnel/
-│   └── playit.toml
+│   ├── playit.toml
+│   └── playitd.log
 ├── backups/
 ├── instance/
 │   ├── eula.txt
@@ -43,8 +44,9 @@ whatever is missing is downloaded again on the next start.
 ## `.tunnel/`
 
 Present when the manifest has a `[tunnel]` section. Holds the installed
-tunnel agents, keyed by version like `.java/`, and `playit.toml`, the secret
-that links the agent to a tunnel provider account. The secret file is
+tunnel agents, keyed by version like `.java/`, the agent's log in
+`playitd.log` when its output is not shown in the terminal, and
+`playit.toml`, the secret that links the agent to a tunnel provider account. The secret file is
 created readable only by the owning user when the agent is first claimed,
 and mc refuses to start if its permissions have been loosened. Deleting it
 makes the next start claim a new agent; `mc tunnel claim --force` does the
