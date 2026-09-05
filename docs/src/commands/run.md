@@ -21,7 +21,7 @@ the remote console (RCON) for live administration.
 
 With a `[tunnel]` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
-startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
+startup, even with `--quiet`. The agent's output is hidden unless `--tunnel-logs` is passed, and
 goes to `.tunnel/playitd.log` otherwise. The first start from a terminal prints a claim link to approve in a
 browser and saves the resulting secret under `.tunnel/`. Without a terminal
 and without a secret, `mc run` fails with instructions rather than waiting —

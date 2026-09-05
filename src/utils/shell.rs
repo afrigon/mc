@@ -110,6 +110,16 @@ impl Shell {
         self.print(&status, Some(&message), &HEADER, true)
     }
 
+    /// A status line shown even under `--quiet`, for output the user asked
+    /// for rather than progress.
+    pub fn status_always<S, M>(&mut self, status: S, message: M) -> anyhow::Result<()>
+    where
+        S: fmt::Display,
+        M: fmt::Display
+    {
+        self.output_stderr(&status, Some(&message), &HEADER, true)
+    }
+
     pub fn error<M>(&mut self, message: M) -> anyhow::Result<()>
     where
         M: fmt::Display
