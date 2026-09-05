@@ -23,7 +23,6 @@ use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
 use crate::ops::backups::BackupOptions;
 use crate::ops::eula::EulaApplyOptions;
-use crate::ops::init::InitDirectoriesOptions;
 use crate::ops::java::JavaInstallOptions;
 use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
@@ -97,8 +96,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     let instance_path = path.join("instance");
     let staging_path = path.join("temp");
 
-    let init_directories_options = InitDirectoriesOptions { path: path.clone() };
-    ops::init::init_directories(context, &init_directories_options).await?;
+    tokio::fs::create_dir_all(&instance_path).await?;
 
     // Take exclusive ownership of the world for as long as this server runs, so a
     // second `mc run` or a restore cannot touch it underneath us.

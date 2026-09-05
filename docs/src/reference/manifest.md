@@ -32,8 +32,10 @@ lithium = "..."
 enabled = true
 frequency = "0 0 * * * *"
 
-[tunnel]
-provider = "playit"
+[backups.storage]
+type = "local"
+path = "backups"
+keep = 20
 ```
 
 ## `name` (required)
@@ -191,6 +193,9 @@ Scheduled world backups, taken while the instance runs.
   `false`. Manual [`mc backup`](../commands/backup.md) works regardless.
 - `frequency` — a cron expression with six fields: seconds, minutes, hours,
   day of month, month, day of week. Defaults to `"0 0 * * * *"` (hourly).
+- `storage` — where archives are stored; see below. When the table is
+  omitted, archives go to local storage under `backups`, keeping the 20 most
+  recent.
 
 ### `[backups.storage]`
 
@@ -199,7 +204,7 @@ Where archives are stored. `type` selects the backend:
 ```toml
 [backups.storage]
 type = "local"
-path = "backups"    # default
+path = "backups"    # required once the table is written
 keep = 20           # most-recent archives to keep; default
 ```
 
