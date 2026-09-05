@@ -52,8 +52,7 @@ connections.
 ## Storage
 
 Archives go to the storage target named by the `storage` node of `backups`.
-Its first value selects the backend; the backend's settings follow as
-properties on the same node. Two backends are supported.
+Its first value selects the backend. Two backends are supported.
 
 **Local** (the default) stores archives in a directory and keeps only the
 `keep` most recent automatic ones:

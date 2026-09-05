@@ -3,6 +3,7 @@
 The `mc.kdl` manifest at the root of an instance describes everything about
 it. It is written in [KDL](https://kdl.dev). Every section except the two
 top-level keys is optional; omitted keys take the defaults listed below.
+Unknown or repeated keys are an error.
 
 ```kdl
 name "myserver"
@@ -39,17 +40,6 @@ backups {
 }
 ```
 
-A few KDL rules to keep in mind:
-
-- Every setting is a node: the key, a space, then the value. Strings are
-  quoted, numbers are bare, and booleans are `#true` and `#false`.
-- A section is a block, `name { ... }`, holding one node per setting.
-- A list is written as several values on one node:
-  `jvm-arguments "-a" "-b"`.
-- Comments start with `//`.
-- Unknown or repeated keys are an error, so a misspelled key cannot silently
-  fall back to its default.
-
 ## `name` (required)
 
 The instance name. It names the world directory inside the instance and is
@@ -70,9 +60,8 @@ The Java runtime used to launch the instance.
   one marked `(recommended)` is the default.
 - `min-memory` — initial heap size in megabytes. Defaults to `4096`.
 - `max-memory` — maximum heap size in megabytes. Defaults to `4096`.
-- `jvm-arguments` — extra arguments passed to the JVM, as several values on
-  the one node. Defaults to a small set of tuned flags; setting this key
-  replaces the defaults entirely.
+- `jvm-arguments` — extra arguments passed to the JVM. Defaults to a small
+  set of tuned flags; setting this key replaces the defaults entirely.
 
 ```kdl
 java {
@@ -198,8 +187,7 @@ Scheduled world backups, taken while the instance runs.
 
 ### `storage`
 
-Where archives are stored. The first value selects the backend, and its
-settings follow as `key=value` properties on the same node:
+Where archives are stored. The first value selects the backend:
 
 ```kdl
 backups {
