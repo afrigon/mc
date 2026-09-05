@@ -31,9 +31,6 @@ lithium = "..."
 [backups]
 enabled = true
 frequency = "0 0 * * * *"
-
-[tunnel]
-provider = "playit"
 ```
 
 ## `name` (required)
