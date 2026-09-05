@@ -336,6 +336,20 @@ fn agent_command(options: &TunnelAgentOptions) -> Command {
 
     utils::process::detach_from_terminal_signals(&mut command);
 
+    // Ask the kernel to interrupt the agent when mc dies without a chance to
+    // stop it. The signal is tied to the spawning thread, which is a runtime
+    // worker that lives as long as mc does.
+    #[cfg(target_os = "linux")]
+    unsafe {
+        command.pre_exec(|| {
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGINT) == 0 {
+                Ok(())
+            } else {
+                Err(std::io::Error::last_os_error())
+            }
+        });
+    }
+
     command
 }
 
