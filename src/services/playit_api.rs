@@ -243,7 +243,7 @@ impl PlayitApiCreateTunnel {
 }
 
 #[derive(Serialize)]
-#[serde(tag = "type", content = "details", rename_all = "lowercase")]
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
 pub enum PlayitApiTunnelOrigin {
     Agent {
         agent_id: String,
