@@ -137,7 +137,7 @@ pub(super) fn create_document_base(
     let mut backups = utils::kdl::node("backups", 0);
     utils::kdl::add_blank_line_before(&mut backups);
     backups.ensure_children().nodes_mut().extend([
-        utils::kdl::leaf("enabled", true, 1),
+        utils::kdl::node("on", 1),
         utils::kdl::leaf("frequency", utils::kdl::quoted("0 0 * * * *"), 1)
     ]);
     nodes.push(backups);

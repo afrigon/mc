@@ -10,13 +10,11 @@ use std::sync::PoisonError;
 
 use anyhow::Context;
 use chrono::NaiveDateTime;
-use kdl::KdlNode;
 use minecraft_client_rs::Client;
 use tempfile::NamedTempFile;
 use tokio_util::sync::CancellationToken;
 
 use crate::context::McContext;
-use crate::manifest::FromKdlNode;
 use crate::ops::backups::local::LocalBackupBackend;
 use crate::ops::backups::s3::S3BackupBackend;
 use crate::ops::lock::InstanceLocks;
@@ -57,13 +55,11 @@ pub enum Backend {
 impl Backend {
     pub fn from_storage(storage: &BackupStorage, world_name: &str) -> McResult<Backend> {
         let backend = match storage {
-            BackupStorage::S3 { bucket } => {
-                let bucket = bucket.clone().context(
-                    "no S3 bucket is configured; set `bucket` on the `storage` node of `backups` in mc.kdl or the MC_BACKUPS_S3_BUCKET environment variable"
-                )?;
-
-                Backend::S3(S3BackupBackend::new(bucket, world_name.to_string()))
-            }
+            BackupStorage::S3 { bucket, region } => Backend::S3(S3BackupBackend::new(
+                bucket.clone(),
+                region.clone(),
+                world_name.to_string()
+            )),
             BackupStorage::Local { path, keep } => {
                 if *keep == 0 {
                     anyhow::bail!(
@@ -158,50 +154,15 @@ fn validate_backup_name(name: &str) -> McResult<()> {
 #[derive(Clone)]
 pub enum BackupStorage {
     S3 {
-        /// May be omitted in `mc.kdl` and supplied via `MC_BACKUPS_S3_BUCKET`.
-        bucket: Option<String>
+        /// `MC_BACKUPS_S3_BUCKET` overrides the manifest value.
+        bucket: String,
+        region: Option<String>
     },
     Local {
         path: PathBuf,
 
         /// Keep only this many most-recent backups, pruning older ones.
         keep: usize
-    }
-}
-
-impl FromKdlNode for BackupStorage {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        if node.children().is_some() {
-            anyhow::bail!("the `storage` node does not take children");
-        }
-
-        let kind = match utils::kdl::arguments(node).as_slice() {
-            [kind] => kind
-                .as_string()
-                .ok_or_else(|| anyhow::anyhow!("the storage kind must be a string"))?,
-            _ => anyhow::bail!("the `storage` node takes a single kind, `local` or `s3`")
-        };
-
-        match kind {
-            "local" => {
-                utils::kdl::check_properties(node, &["path", "keep"])?;
-
-                Ok(BackupStorage::Local {
-                    path: utils::kdl::string_property(node, "path")?
-                        .map(PathBuf::from)
-                        .ok_or_else(|| anyhow::anyhow!("local storage requires a `path`"))?,
-                    keep: utils::kdl::integer_property(node, "keep")?.unwrap_or(20)
-                })
-            }
-            "s3" => {
-                utils::kdl::check_properties(node, &["bucket"])?;
-
-                Ok(BackupStorage::S3 {
-                    bucket: utils::kdl::string_property(node, "bucket")?.map(str::to_owned)
-                })
-            }
-            _ => anyhow::bail!("unknown storage kind `{}`, expected `local` or `s3`", kind)
-        }
     }
 }
 

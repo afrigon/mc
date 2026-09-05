@@ -1,6 +1,7 @@
 pub mod document;
 pub mod lock;
 pub mod presets;
+mod raw;
 
 #[cfg(test)]
 mod tests;
@@ -8,21 +9,28 @@ mod tests;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::env;
+use std::path::PathBuf;
 
 use anyhow::Context;
-use kdl::KdlDocument;
-use kdl::KdlNode;
-use kdl::KdlValue;
 use url::Url;
 
 use crate::context::McContext;
 use crate::java::JavaDescriptor;
+use crate::manifest::raw::RawBackups;
+use crate::manifest::raw::RawJava;
+use crate::manifest::raw::RawManifest;
+use crate::manifest::raw::RawMinecraft;
+use crate::manifest::raw::RawMods;
+use crate::manifest::raw::RawNotifications;
+use crate::manifest::raw::RawProperty;
+use crate::manifest::raw::RawSeed;
+use crate::manifest::raw::RawServer;
+use crate::manifest::raw::RawTunnel;
 use crate::minecraft::MinecraftDifficulty;
 use crate::minecraft::MinecraftGamemode;
 use crate::minecraft::MinecraftLevelKind;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::mods::loader::LoaderKind;
-use crate::mods::service::ModServiceKind;
 use crate::ops::backups::BackupStorage;
 use crate::ops::notifications::NotificationKind;
 use crate::ops::notifications::NotificationTarget;
@@ -39,10 +47,6 @@ use crate::utils::product_descriptor::ProductDescriptor;
 use crate::utils::product_descriptor::RawProductDescriptor;
 use crate::utils::product_descriptor::VersionResolver;
 
-pub trait FromKdlNode: Sized {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self>;
-}
-
 pub struct Manifest {
     pub name: String,
     pub description: String,
@@ -58,43 +62,10 @@ pub struct Manifest {
 impl Manifest {
     pub fn from_kdl_str(source: &str) -> McResult<Manifest> {
         let document = utils::kdl::parse_document(source)?;
+        let validated = utils::kdl::validate(source, &document)?;
+        let raw: RawManifest = utils::kdl::deserialize(source)?;
 
-        utils::kdl::check_children(
-            &document,
-            "the manifest",
-            &[
-                "name",
-                "description",
-                "java",
-                "minecraft",
-                "server",
-                "mods",
-                "backups",
-                "notifications",
-                "tunnel"
-            ]
-        )?;
-
-        Ok(Manifest {
-            name: utils::kdl::string_argument(utils::kdl::required_child(&document, "name")?)?
-                .to_owned(),
-            description: utils::kdl::string_argument(utils::kdl::required_child(
-                &document,
-                "description"
-            )?)?
-            .to_owned(),
-            java: section(&document, "java")?,
-            minecraft: section(&document, "minecraft")?,
-            server: section(&document, "server")?,
-            mods: mods_section(&document)?,
-            backups: section(&document, "backups")?,
-            notifications: section(&document, "notifications")?,
-            tunnel: document
-                .get("tunnel")
-                .map(ManifestTunnel::from_kdl_node)
-                .transpose()
-                .context("invalid `tunnel` section")?
-        })
+        raw.resolve(validated.bare_tunnel)
     }
 
     /// Providers are enabled by their webhook environment variable alone; the
@@ -129,119 +100,81 @@ impl Manifest {
     }
 }
 
-fn section<T: FromKdlNode + Default>(document: &KdlDocument, name: &str) -> McResult<T> {
-    document
-        .get(name)
-        .map(T::from_kdl_node)
-        .transpose()
-        .with_context(|| format!("invalid `{}` section", name))
-        .map(Option::unwrap_or_default)
+impl RawManifest {
+    fn resolve(self, bare_tunnel: bool) -> McResult<Manifest> {
+        let tunnel = if bare_tunnel {
+            Some(ManifestTunnel::default())
+        } else {
+            self.tunnel
+                .map(RawTunnel::resolve)
+                .transpose()
+                .context("invalid `tunnel` section")?
+        };
+
+        Ok(Manifest {
+            name: self.name,
+            description: self.description,
+            java: self.java.resolve().context("invalid `java` section")?,
+            minecraft: self
+                .minecraft
+                .resolve()
+                .context("invalid `minecraft` section")?,
+            server: self.server.resolve().context("invalid `server` section")?,
+            mods: self.mods.resolve().context("invalid `mods` section")?,
+            backups: self
+                .backups
+                .resolve()
+                .context("invalid `backups` section")?,
+            notifications: self.notifications.resolve(),
+            tunnel
+        })
+    }
 }
 
-fn mods_section(document: &KdlDocument) -> McResult<HashMap<String, ManifestMod>> {
-    let mut mods = HashMap::new();
-
-    let Some(node) = document.get("mods") else {
-        return Ok(mods);
-    };
-
-    utils::kdl::check_properties(node, &[])?;
-
-    if !utils::kdl::arguments(node).is_empty() {
-        anyhow::bail!("the `mods` node does not take values, list mods as children");
-    }
-
-    for entry in node.iter_children() {
-        let name = entry.name().value();
-
-        if mods.contains_key(name) {
-            anyhow::bail!("the mod `{}` is listed more than once", name);
-        }
-
-        let m = ManifestMod::from_kdl_node(entry)
-            .with_context(|| format!("invalid mod entry `{}`", name))?;
-
-        mods.insert(name.to_owned(), m);
-    }
-
-    Ok(mods)
-}
-
-/// Children of a section node, once the section itself has been checked to
-/// carry nothing but children.
-fn children<'a>(node: &'a KdlNode, allowed: &[&str]) -> McResult<Option<&'a KdlDocument>> {
-    let name = node.name().value();
-
-    utils::kdl::check_properties(node, &[])?;
-
-    if !utils::kdl::arguments(node).is_empty() {
-        anyhow::bail!(
-            "the `{}` node does not take values, use a block instead",
-            name
-        );
-    }
-
-    match node.children() {
-        Some(children) => {
-            utils::kdl::check_children(children, &format!("the `{}` section", name), allowed)?;
-
-            Ok(Some(children))
-        }
-        None => Ok(None)
+fn parse_or<T>(value: Option<String>, default: T) -> McResult<T>
+where
+    T: std::str::FromStr,
+    T::Err: Into<anyhow::Error>
+{
+    match value {
+        Some(value) => value.parse().map_err(Into::into),
+        None => Ok(default)
     }
 }
 
 pub enum ManifestMod {
-    Version(String),
-    Detailed {
-        version: String,
-        service: ModServiceKind
-    },
-    Remote {
-        url: Url
+    Modrinth(String),
+    Http(Url)
+}
+
+impl RawMods {
+    fn resolve(self) -> McResult<HashMap<String, ManifestMod>> {
+        let mut mods = HashMap::new();
+
+        for (name, version) in self.modrinth.unwrap_or_default() {
+            insert_mod(&mut mods, name, ManifestMod::Modrinth(version))?;
+        }
+
+        for (name, url) in self.http.unwrap_or_default() {
+            insert_mod(&mut mods, name, ManifestMod::Http(url))?;
+        }
+
+        Ok(mods)
     }
 }
 
-impl FromKdlNode for ManifestMod {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        utils::kdl::check_properties(node, &["service", "url"])?;
-
-        if node.children().is_some() {
-            anyhow::bail!("a mod entry does not take children");
-        }
-
-        let url = utils::kdl::string_property(node, "url")?;
-        let service = utils::kdl::string_property(node, "service")?;
-
-        match (utils::kdl::arguments(node).as_slice(), url) {
-            ([], Some(url)) => {
-                if service.is_some() {
-                    anyhow::bail!("a mod fetched from a url cannot name a service");
-                }
-
-                Ok(ManifestMod::Remote {
-                    url: Url::parse(url).context("invalid mod url")?
-                })
-            }
-            ([version], None) => {
-                let version = version
-                    .as_string()
-                    .ok_or_else(|| anyhow::anyhow!("the mod version must be a string"))?
-                    .to_owned();
-
-                match service {
-                    Some(service) => Ok(ManifestMod::Detailed {
-                        version,
-                        service: service.parse()?
-                    }),
-                    None => Ok(ManifestMod::Version(version))
-                }
-            }
-            ([_], Some(_)) => anyhow::bail!("a mod takes either a version or a url, not both"),
-            ([], None) => anyhow::bail!("a mod requires a version or a url"),
-            _ => anyhow::bail!("a mod takes a single version")
-        }
+fn insert_mod(
+    mods: &mut HashMap<String, ManifestMod>,
+    name: String,
+    m: ManifestMod
+) -> McResult<()> {
+    if mods.contains_key(&name) {
+        anyhow::bail!("the mod `{}` is listed under more than one source", name);
     }
+
+    mods.insert(name, m);
+
+    Ok(())
 }
 
 pub struct ManifestJava {
@@ -288,35 +221,16 @@ impl Default for ManifestJava {
     }
 }
 
-impl FromKdlNode for ManifestJava {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut java = ManifestJava::default();
+impl RawJava {
+    fn resolve(self) -> McResult<ManifestJava> {
+        let defaults = ManifestJava::default();
 
-        let Some(children) = children(
-            node,
-            &["version", "min-memory", "max-memory", "jvm-arguments"]
-        )?
-        else {
-            return Ok(java);
-        };
-
-        if let Some(version) = children.get("version") {
-            java.version = utils::kdl::parse_argument(version)?;
-        }
-
-        if let Some(min_memory) = children.get("min-memory") {
-            java.min_memory = utils::kdl::integer_argument(min_memory)?;
-        }
-
-        if let Some(max_memory) = children.get("max-memory") {
-            java.max_memory = utils::kdl::integer_argument(max_memory)?;
-        }
-
-        if let Some(jvm_arguments) = children.get("jvm-arguments") {
-            java.jvm_arguments = utils::kdl::string_arguments(jvm_arguments)?;
-        }
-
-        Ok(java)
+        Ok(ManifestJava {
+            version: parse_or(self.version, defaults.version)?,
+            min_memory: self.min_memory.unwrap_or(defaults.min_memory),
+            max_memory: self.max_memory.unwrap_or(defaults.max_memory),
+            jvm_arguments: self.jvm_arguments.unwrap_or(defaults.jvm_arguments)
+        })
     }
 }
 
@@ -341,19 +255,13 @@ impl Default for ManifestTunnel {
     }
 }
 
-impl FromKdlNode for ManifestTunnel {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut tunnel = ManifestTunnel::default();
+impl RawTunnel {
+    fn resolve(self) -> McResult<ManifestTunnel> {
+        let defaults = ManifestTunnel::default();
 
-        let Some(children) = children(node, &["provider"])? else {
-            return Ok(tunnel);
-        };
-
-        if let Some(provider) = children.get("provider") {
-            tunnel.provider = utils::kdl::parse_argument(provider)?;
-        }
-
-        Ok(tunnel)
+        Ok(ManifestTunnel {
+            provider: parse_or(self.provider, defaults.provider)?
+        })
     }
 }
 
@@ -382,23 +290,12 @@ impl ManifestMinecraft {
     }
 }
 
-impl FromKdlNode for ManifestMinecraft {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut minecraft = ManifestMinecraft::default();
-
-        let Some(children) = children(node, &["version", "loader"])? else {
-            return Ok(minecraft);
-        };
-
-        if let Some(version) = children.get("version") {
-            minecraft.version = Some(utils::kdl::string_argument(version)?.to_owned());
-        }
-
-        if let Some(loader) = children.get("loader") {
-            minecraft.loader = Some(utils::kdl::parse_argument(loader)?);
-        }
-
-        Ok(minecraft)
+impl RawMinecraft {
+    fn resolve(self) -> McResult<ManifestMinecraft> {
+        Ok(ManifestMinecraft {
+            version: self.version,
+            loader: self.loader.map(|loader| loader.parse()).transpose()?
+        })
     }
 }
 
@@ -423,45 +320,19 @@ impl Default for ManifestNotifications {
     }
 }
 
-impl FromKdlNode for ManifestNotifications {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut notifications = ManifestNotifications::default();
+impl RawNotifications {
+    fn resolve(self) -> ManifestNotifications {
+        let defaults = ManifestNotifications::default();
 
-        let Some(children) = children(
-            node,
-            &[
-                "on-lifecycle-event",
-                "on-backup",
-                "on-backup-failure",
-                "on-panic",
-                "on-sigkill"
-            ]
-        )?
-        else {
-            return Ok(notifications);
-        };
-
-        if let Some(value) = children.get("on-lifecycle-event") {
-            notifications.on_lifecycle_event = utils::kdl::bool_argument(value)?;
+        ManifestNotifications {
+            on_lifecycle_event: self
+                .on_lifecycle_event
+                .unwrap_or(defaults.on_lifecycle_event),
+            on_backup: self.on_backup.unwrap_or(defaults.on_backup),
+            on_backup_failure: self.on_backup_failure.unwrap_or(defaults.on_backup_failure),
+            on_panic: self.on_panic.unwrap_or(defaults.on_panic),
+            on_sigkill: self.on_sigkill.unwrap_or(defaults.on_sigkill)
         }
-
-        if let Some(value) = children.get("on-backup") {
-            notifications.on_backup = utils::kdl::bool_argument(value)?;
-        }
-
-        if let Some(value) = children.get("on-backup-failure") {
-            notifications.on_backup_failure = utils::kdl::bool_argument(value)?;
-        }
-
-        if let Some(value) = children.get("on-panic") {
-            notifications.on_panic = utils::kdl::bool_argument(value)?;
-        }
-
-        if let Some(value) = children.get("on-sigkill") {
-            notifications.on_sigkill = utils::kdl::bool_argument(value)?;
-        }
-
-        Ok(notifications)
     }
 }
 
@@ -507,103 +378,35 @@ impl ManifestServer {
     }
 }
 
-impl FromKdlNode for ManifestServer {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut server = ManifestServer::default();
+impl RawServer {
+    fn resolve(self) -> McResult<ManifestServer> {
+        let defaults = ManifestServer::default();
+        let mut properties = BTreeMap::new();
 
-        let Some(children) = children(
-            node,
-            &[
-                "gamemode",
-                "difficulty",
-                "level-type",
-                "hardcore",
-                "seed",
-                "eula",
-                "ip",
-                "port",
-                "rcon-port",
-                "capacity",
-                "view-distance",
-                "simulation-distance",
-                "properties"
-            ]
-        )?
-        else {
-            return Ok(server);
-        };
-
-        if let Some(value) = children.get("gamemode") {
-            server.gamemode = utils::kdl::parse_argument(value)?;
+        if let Some(raw_properties) = self.properties {
+            flatten_properties(None, raw_properties, &mut properties)?;
         }
 
-        if let Some(value) = children.get("difficulty") {
-            server.difficulty = utils::kdl::parse_argument(value)?;
-        }
-
-        if let Some(value) = children.get("level-type") {
-            server.level_type = utils::kdl::parse_argument(value)?;
-        }
-
-        if let Some(value) = children.get("hardcore") {
-            server.hardcore = utils::kdl::bool_argument(value)?;
-        }
-
-        if let Some(value) = children.get("seed") {
-            server.seed = Some(seed(value)?);
-        }
-
-        if let Some(value) = children.get("eula") {
-            server.eula = utils::kdl::bool_argument(value)?;
-        }
-
-        if let Some(value) = children.get("ip") {
-            server.ip = Some(utils::kdl::string_argument(value)?.to_owned());
-        }
-
-        if let Some(value) = children.get("port") {
-            server.port = utils::kdl::integer_argument(value)?;
-        }
-
-        if let Some(value) = children.get("rcon-port") {
-            server.rcon_port = utils::kdl::integer_argument(value)?;
-        }
-
-        if let Some(value) = children.get("capacity") {
-            server.capacity = utils::kdl::integer_argument(value)?;
-        }
-
-        if let Some(value) = children.get("view-distance") {
-            server.view_distance = utils::kdl::integer_argument(value)?;
-        }
-
-        if let Some(value) = children.get("simulation-distance") {
-            server.simulation_distance = utils::kdl::integer_argument(value)?;
-        }
-
-        if let Some(properties) = children.get("properties") {
-            utils::kdl::check_properties(properties, &[])?;
-
-            if !utils::kdl::arguments(properties).is_empty() {
-                anyhow::bail!("the `properties` node does not take values, use a block instead");
-            }
-
-            if let Some(entries) = properties.children() {
-                flatten_properties(None, entries, &mut server.properties)?;
-            }
-        }
-
-        Ok(server)
-    }
-}
-
-fn seed(node: &KdlNode) -> McResult<MinecraftSeed> {
-    match utils::kdl::argument(node)? {
-        KdlValue::Integer(integer) => Ok(MinecraftSeed::Numeric(
-            i64::try_from(*integer).context("the seed is out of range")?
-        )),
-        KdlValue::String(text) => Ok(MinecraftSeed::Text(text.clone())),
-        _ => anyhow::bail!("the seed must be an integer or a string")
+        Ok(ManifestServer {
+            gamemode: parse_or(self.gamemode, defaults.gamemode)?,
+            difficulty: parse_or(self.difficulty, defaults.difficulty)?,
+            level_type: parse_or(self.level_type, defaults.level_type)?,
+            hardcore: self.hardcore.unwrap_or(defaults.hardcore),
+            seed: self.seed.map(|seed| match seed {
+                RawSeed::Numeric(seed) => MinecraftSeed::Numeric(seed),
+                RawSeed::Text(seed) => MinecraftSeed::Text(seed)
+            }),
+            eula: self.eula.unwrap_or(defaults.eula),
+            ip: self.ip,
+            port: self.port.unwrap_or(defaults.port),
+            rcon_port: self.rcon_port.unwrap_or(defaults.rcon_port),
+            capacity: self.capacity.unwrap_or(defaults.capacity),
+            view_distance: self.view_distance.unwrap_or(defaults.view_distance),
+            simulation_distance: self
+                .simulation_distance
+                .unwrap_or(defaults.simulation_distance),
+            properties
+        })
     }
 }
 
@@ -611,35 +414,29 @@ fn seed(node: &KdlNode) -> McResult<MinecraftSeed> {
 // `rcon { port 25575 }` and `"rcon.port" 25575` are the same override.
 fn flatten_properties(
     prefix: Option<&str>,
-    document: &KdlDocument,
+    properties: BTreeMap<String, RawProperty>,
     output: &mut BTreeMap<String, String>
 ) -> McResult<()> {
-    for node in document.nodes() {
+    for (key, value) in properties {
         let key = match prefix {
-            Some(prefix) => format!("{}.{}", prefix, node.name().value()),
-            None => node.name().value().to_owned()
+            Some(prefix) => format!("{}.{}", prefix, key),
+            None => key
         };
 
-        utils::kdl::check_properties(node, &[])?;
+        let value = match value {
+            RawProperty::Nested(inner) => {
+                flatten_properties(Some(&key), inner, output)?;
 
-        match (utils::kdl::arguments(node).as_slice(), node.children()) {
-            ([], Some(children)) => flatten_properties(Some(&key), children, output)?,
-            ([value], None) => {
-                let value = utils::kdl::scalar_to_string(value).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "the server property `{}` must be a string, integer, float, or boolean",
-                        key
-                    )
-                })?;
-
-                if output.insert(key.clone(), value).is_some() {
-                    anyhow::bail!("the server property `{}` is set more than once", key);
-                }
+                continue;
             }
-            _ => anyhow::bail!(
-                "the server property `{}` must have either a single value or a block",
-                key
-            )
+            RawProperty::Bool(value) => value.to_string(),
+            RawProperty::Integer(value) => value.to_string(),
+            RawProperty::Float(value) => value.to_string(),
+            RawProperty::Text(value) => value
+        };
+
+        if output.insert(key.clone(), value).is_some() {
+            anyhow::bail!("the server property `{}` is set more than once", key);
         }
     }
 
@@ -658,11 +455,12 @@ impl ManifestBackups {
     /// other storage types ignore it.
     pub fn effective_storage(&self) -> BackupStorage {
         match &self.storage {
-            BackupStorage::S3 { bucket } => BackupStorage::S3 {
+            BackupStorage::S3 { bucket, region } => BackupStorage::S3 {
                 bucket: env::var("MC_BACKUPS_S3_BUCKET")
                     .ok()
                     .filter(|bucket| !bucket.is_empty())
-                    .or_else(|| bucket.clone())
+                    .unwrap_or_else(|| bucket.clone()),
+                region: region.clone()
             },
             local => local.clone()
         }
@@ -682,26 +480,30 @@ impl Default for ManifestBackups {
     }
 }
 
-impl FromKdlNode for ManifestBackups {
-    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
-        let mut backups = ManifestBackups::default();
+impl RawBackups {
+    fn resolve(self) -> McResult<ManifestBackups> {
+        let defaults = ManifestBackups::default();
+        let keep = self.keep.unwrap_or(20);
 
-        let Some(children) = children(node, &["enabled", "frequency", "storage"])? else {
-            return Ok(backups);
+        let storage = match (self.local, self.s3) {
+            (Some(_), Some(_)) => {
+                anyhow::bail!("backups can use either `local` or `s3` storage, not both")
+            }
+            (Some(path), None) => BackupStorage::Local { path, keep },
+            (None, Some(s3)) => BackupStorage::S3 {
+                bucket: s3.bucket,
+                region: s3.region
+            },
+            (None, None) => BackupStorage::Local {
+                path: PathBuf::from("backups"),
+                keep
+            }
         };
 
-        if let Some(enabled) = children.get("enabled") {
-            backups.enabled = utils::kdl::bool_argument(enabled)?;
-        }
-
-        if let Some(frequency) = children.get("frequency") {
-            backups.frequency = utils::kdl::string_argument(frequency)?.to_owned();
-        }
-
-        if let Some(storage) = children.get("storage") {
-            backups.storage = BackupStorage::from_kdl_node(storage)?;
-        }
-
-        Ok(backups)
+        Ok(ManifestBackups {
+            enabled: self.on,
+            frequency: self.frequency.unwrap_or(defaults.frequency),
+            storage
+        })
     }
 }

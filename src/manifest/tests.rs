@@ -12,7 +12,6 @@ use crate::minecraft::MinecraftDifficulty;
 use crate::minecraft::MinecraftGamemode;
 use crate::minecraft::MinecraftLevelKind;
 use crate::minecraft::seed::MinecraftSeed;
-use crate::mods::service::ModServiceKind;
 use crate::ops::backups::BackupStorage;
 use crate::utils::errors::McResult;
 
@@ -60,15 +59,21 @@ server {
 }
 
 mods {
-    lithium "UPNexAfy"
-    carpet "bGrLxJ8v" service="modrinth"
-    my-mod url="https://example.com/my-mod.jar"
+    modrinth {
+        lithium "UPNexAfy"
+        carpet "bGrLxJ8v"
+    }
+
+    http {
+        my-mod "https://example.com/my-mod.jar"
+    }
 }
 
 backups {
-    enabled #true
-    frequency "0 0 * * * *"
-    storage "local" path="/mnt/data/mc" keep=5
+    on
+    frequency "0 30 * * * *"
+    keep 5
+    s3 "my-bucket" region="us-east-1"
 }
 
 notifications {
@@ -157,22 +162,22 @@ fn full_manifest_decodes() -> McResult<()> {
     assert_eq!(manifest.mods.len(), 3);
     assert!(matches!(
         manifest.mods.get("lithium"),
-        Some(ManifestMod::Version(version)) if version == "UPNexAfy"
+        Some(ManifestMod::Modrinth(version)) if version == "UPNexAfy"
     ));
     assert!(matches!(
         manifest.mods.get("carpet"),
-        Some(ManifestMod::Detailed { version, service: ModServiceKind::Modrinth }) if version == "bGrLxJ8v"
+        Some(ManifestMod::Modrinth(version)) if version == "bGrLxJ8v"
     ));
     assert!(matches!(
         manifest.mods.get("my-mod"),
-        Some(ManifestMod::Remote { url }) if url.as_str() == "https://example.com/my-mod.jar"
+        Some(ManifestMod::Http(url)) if url.as_str() == "https://example.com/my-mod.jar"
     ));
 
     assert!(manifest.backups.enabled);
-    assert_eq!(manifest.backups.frequency, "0 0 * * * *");
+    assert_eq!(manifest.backups.frequency, "0 30 * * * *");
     assert!(matches!(
         &manifest.backups.storage,
-        BackupStorage::Local { path, keep: 5 } if path.to_str() == Some("/mnt/data/mc")
+        BackupStorage::S3 { bucket, region: Some(region) } if bucket == "my-bucket" && region == "us-east-1"
     ));
 
     assert!(!manifest.notifications.on_lifecycle_event);
@@ -211,6 +216,7 @@ fn minimal_manifest_uses_defaults() -> McResult<()> {
     assert!(manifest.server.property_overrides()?.is_empty());
     assert!(manifest.mods.is_empty());
     assert!(!manifest.backups.enabled);
+    assert_eq!(manifest.backups.frequency, "0 0 * * * *");
     assert!(matches!(
         &manifest.backups.storage,
         BackupStorage::Local { path, keep: 20 } if path.to_str() == Some("backups")
@@ -222,36 +228,12 @@ fn minimal_manifest_uses_defaults() -> McResult<()> {
 }
 
 #[test]
-fn tunnel_section_without_provider_uses_the_default_provider() -> McResult<()> {
-    for source in [with_section("tunnel"), with_section("tunnel {\n}")] {
-        let manifest = Manifest::from_kdl_str(&source)?;
-
-        assert_eq!(
-            manifest.tunnel.map(|tunnel| tunnel.provider),
-            Some("playit".parse()?)
-        );
-    }
-
-    Ok(())
-}
-
-#[test]
-fn local_storage_requires_a_path() {
-    let source = with_section("backups {\n    storage \"local\" keep=3\n}");
-    let message = error_message(Manifest::from_kdl_str(&source));
-
-    assert!(
-        message.contains("local storage requires a `path`"),
-        "{message}"
-    );
-}
-
-#[test]
-fn empty_section_uses_defaults() -> McResult<()> {
-    let manifest = Manifest::from_kdl_str(&with_section("java\nserver {\n}"))?;
+fn empty_blocks_use_defaults() -> McResult<()> {
+    let manifest = Manifest::from_kdl_str(&with_section("java {\n}\nserver {\n}\nmods {\n}"))?;
 
     assert_eq!(manifest.java.max_memory, 4096);
     assert_eq!(manifest.server.capacity, 20);
+    assert!(manifest.mods.is_empty());
 
     Ok(())
 }
@@ -260,7 +242,7 @@ fn empty_section_uses_defaults() -> McResult<()> {
 fn missing_name_is_rejected() {
     let message = error_message(Manifest::from_kdl_str("description \"d\"\n"));
 
-    assert!(message.contains("`name` node is required"), "{message}");
+    assert!(message.contains("missing field `name`"), "{message}");
 }
 
 #[test]
@@ -276,129 +258,209 @@ fn seed_accepts_text() -> McResult<()> {
 }
 
 #[test]
-fn mod_with_version_and_url_is_rejected() {
-    let source = with_section("mods {\n    a \"v\" url=\"https://example.com/a.jar\"\n}");
-    let message = error_message(Manifest::from_kdl_str(&source));
+fn backups_flag_forms() -> McResult<()> {
+    let off = Manifest::from_kdl_str(&with_section("backups {\n    keep 3\n}"))?;
+    assert!(!off.backups.enabled);
+    assert!(matches!(
+        off.backups.storage,
+        BackupStorage::Local { keep: 3, .. }
+    ));
 
-    assert!(message.contains("either a version or a url"), "{message}");
+    let on = Manifest::from_kdl_str(&with_section("backups {\n    on\n}"))?;
+    assert!(on.backups.enabled);
+
+    let explicit = Manifest::from_kdl_str(&with_section("backups {\n    on #false\n}"))?;
+    assert!(!explicit.backups.enabled);
+
+    Ok(())
 }
 
 #[test]
-fn mod_without_version_or_url_is_rejected() {
-    let message = error_message(Manifest::from_kdl_str(&with_section("mods {\n    a\n}")));
-
-    assert!(message.contains("requires a version or a url"), "{message}");
-}
-
-#[test]
-fn mod_listed_twice_is_rejected() {
-    let source = with_section("mods {\n    a \"1\"\n    a \"2\"\n}");
-    let message = error_message(Manifest::from_kdl_str(&source));
-
-    assert!(message.contains("listed more than once"), "{message}");
-}
-
-#[test]
-fn storage_s3_decodes_without_bucket() -> McResult<()> {
-    let manifest = Manifest::from_kdl_str(&with_section("backups {\n    storage \"s3\"\n}"))?;
+fn local_storage_decodes() -> McResult<()> {
+    let manifest = Manifest::from_kdl_str(&with_section(
+        "backups {\n    keep 7\n    local \"/mnt/data/mc\"\n}"
+    ))?;
 
     assert!(matches!(
-        manifest.backups.storage,
-        BackupStorage::S3 { bucket: None }
+        &manifest.backups.storage,
+        BackupStorage::Local { path, keep: 7 } if path.to_str() == Some("/mnt/data/mc")
     ));
 
     Ok(())
 }
 
 #[test]
-fn storage_s3_decodes_bucket() -> McResult<()> {
-    let source = with_section("backups {\n    storage \"s3\" bucket=\"b\"\n}");
-    let manifest = Manifest::from_kdl_str(&source)?;
+fn s3_storage_without_region_decodes() -> McResult<()> {
+    let manifest = Manifest::from_kdl_str(&with_section("backups {\n    s3 \"b\"\n}"))?;
 
     assert!(matches!(
         manifest.backups.storage,
-        BackupStorage::S3 { bucket: Some(bucket) } if bucket == "b"
+        BackupStorage::S3 { bucket, region: None } if bucket == "b"
     ));
 
     Ok(())
 }
 
 #[test]
-fn unknown_storage_kind_is_rejected() {
-    let source = with_section("backups {\n    storage \"ftp\" host=\"h\"\n}");
+fn both_storage_targets_are_rejected() {
+    let source = with_section("backups {\n    local \"p\"\n    s3 \"b\"\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
-    assert!(message.contains("unknown storage kind `ftp`"), "{message}");
+    assert!(message.contains("either `local` or `s3`"), "{message}");
 }
 
 #[test]
-fn storage_rejects_property_of_other_kind() {
-    let source = with_section("backups {\n    storage \"local\" bucket=\"b\"\n}");
+fn s3_without_bucket_is_rejected() {
+    let source = with_section("backups {\n    s3 region=\"r\"\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
-    assert!(message.contains("unknown property `bucket`"), "{message}");
+    assert!(message.contains("missing the bucket value"), "{message}");
+    assert!(!message.contains("#0"), "{message}");
 }
 
 #[test]
-fn property_without_scalar_is_rejected() {
-    let source = with_section("server {\n    properties {\n        motd #null\n    }\n}");
+fn s3_unknown_property_is_rejected() {
+    let source = with_section("backups {\n    s3 \"b\" bucket=\"c\"\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
-    assert!(message.contains("`motd` must be a string"), "{message}");
+    assert!(message.contains("unknown field `bucket`"), "{message}");
 }
 
 #[test]
-fn property_with_several_values_is_rejected() {
-    let source = with_section("server {\n    properties {\n        motd \"a\" \"b\"\n    }\n}");
+fn tunnel_forms() -> McResult<()> {
+    for source in [with_section("tunnel"), with_section("tunnel {\n}")] {
+        let manifest = Manifest::from_kdl_str(&source)?;
+
+        assert_eq!(
+            manifest.tunnel.map(|tunnel| tunnel.provider),
+            Some("playit".parse()?)
+        );
+    }
+
+    let pinned =
+        Manifest::from_kdl_str(&with_section("tunnel {\n    provider \"playit@1.0.10\"\n}"))?;
+
+    assert_eq!(
+        pinned.tunnel.map(|tunnel| tunnel.provider),
+        Some("playit@1.0.10".parse()?)
+    );
+
+    Ok(())
+}
+
+#[test]
+fn tunnel_unknown_key_is_rejected() {
+    let source = with_section("tunnel {\n    provider \"playit\"\n    foo 1\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("unknown field `foo`"), "{message}");
+}
+
+#[test]
+fn mod_listed_under_two_sources_is_rejected() {
+    let source = with_section(
+        "mods {\n    modrinth {\n        a \"1\"\n    }\n    http {\n        a \"https://e.com/a.jar\"\n    }\n}"
+    );
     let message = error_message(Manifest::from_kdl_str(&source));
 
     assert!(
-        message.contains("either a single value or a block"),
+        message.contains("`a` is listed under more than one source"),
         "{message}"
     );
 }
 
 #[test]
-fn unknown_node_in_section_is_rejected() {
+fn unknown_mod_source_is_rejected() {
+    let source = with_section("mods {\n    github {\n        a \"b\"\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("unknown field `github`"), "{message}");
+}
+
+#[test]
+fn invalid_mod_url_is_rejected_with_position() {
+    let source = with_section("mods {\n    http {\n        a \"not a url\"\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("line 5, column 11"), "{message}");
+}
+
+#[test]
+fn wrong_value_type_is_rejected_with_position() {
+    let source = with_section("server {\n    hardcore \"yes\"\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("line 4, column 14"), "{message}");
+    assert!(message.contains("expected a boolean"), "{message}");
+}
+
+#[test]
+fn out_of_range_port_is_rejected_with_position() {
+    let source = with_section("server {\n    port 70000\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("line 4, column 10"), "{message}");
+    assert!(message.contains("expected u16"), "{message}");
+}
+
+#[test]
+fn unknown_key_is_rejected() {
     let source = with_section("java {\n    min_memory 1024\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
-    assert!(
-        message.contains("unknown node `min_memory` in the `java` section"),
-        "{message}"
-    );
+    assert!(message.contains("unknown field `min_memory`"), "{message}");
 }
 
 #[test]
-fn unknown_top_level_node_is_rejected() {
-    let message = error_message(Manifest::from_kdl_str(&with_section("jaba {\n}")));
-
-    assert!(
-        message.contains("unknown node `jaba` in the manifest"),
-        "{message}"
-    );
-}
-
-#[test]
-fn repeated_node_is_rejected() {
+fn repeated_key_is_rejected_with_position() {
     let source = with_section("server {\n    port 1\n    port 2\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
     assert!(
-        message.contains("`port` node appears more than once"),
+        message.contains("line 5, column 5: the `port` node appears more than once"),
         "{message}"
     );
 }
 
 #[test]
-fn wrong_value_type_is_rejected() {
-    let source = with_section("server {\n    hardcore \"yes\"\n}");
+fn stray_argument_on_block_is_rejected_with_position() {
+    let source = with_section("server \"stray\" {\n    port 1\n}");
     let message = error_message(Manifest::from_kdl_str(&source));
 
     assert!(
-        message.contains("`hardcore` node must be #true or #false"),
+        message.contains("line 3, column 1: `server` cannot have both values and a block"),
         "{message}"
     );
+}
+
+#[test]
+fn two_values_on_leaf_are_rejected_with_position() {
+    let source = with_section("backups {\n    s3 \"b\" \"c\"\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("line 4, column 5: `s3` takes a single value"),
+        "{message}"
+    );
+}
+
+#[test]
+fn bare_leaf_is_rejected_with_position() {
+    let source = with_section("server {\n    properties {\n        motd\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("line 5, column 9: `motd` is empty"),
+        "{message}"
+    );
+}
+
+#[test]
+fn property_null_is_rejected() {
+    let source = with_section("server {\n    properties {\n        motd #null\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(!message.is_empty(), "{message}");
 }
 
 #[test]
@@ -406,6 +468,20 @@ fn syntax_error_reports_position() {
     let message = error_message(Manifest::from_kdl_str("name \"x\"\ndescription \"oops\n"));
 
     assert!(message.contains("line 2, column"), "{message}");
+}
+
+#[test]
+fn slashdash_node_is_ignored() -> McResult<()> {
+    let manifest =
+        Manifest::from_kdl_str(&with_section("backups {\n    /-local \"x\"\n    on\n}"))?;
+
+    assert!(manifest.backups.enabled);
+    assert!(matches!(
+        &manifest.backups.storage,
+        BackupStorage::Local { path, .. } if path.to_str() == Some("backups")
+    ));
+
+    Ok(())
 }
 
 #[test]
@@ -431,8 +507,13 @@ fn lockfile_round_trips() -> McResult<()> {
 
     assert_eq!(
         text,
-        "mod \"lithium\" version=\"UPNexAfy\" source=\"modrinth\" hash=\"sha512:abc\"\n\
-         mod \"my-mod\" source=\"url+https://example.com/my-mod.jar\"\n"
+        "modrinth {\n\
+         \x20   lithium version=\"UPNexAfy\" hash=\"sha512:abc\"\n\
+         }\n\
+         \n\
+         http {\n\
+         \x20   my-mod url=\"https://example.com/my-mod.jar\"\n\
+         }\n"
     );
 
     let parsed = ModLockfile::from_kdl_str(&text)?;
@@ -450,14 +531,24 @@ fn lockfile_round_trips() -> McResult<()> {
 }
 
 #[test]
-fn set_mod_version_creates_the_block() -> McResult<()> {
+fn empty_lockfile_round_trips() -> McResult<()> {
+    let text = ModLockfile { mods: vec![] }.to_kdl_document().to_string();
+
+    assert_eq!(text, "");
+    assert!(ModLockfile::from_kdl_str(&text)?.mods.is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn set_mod_version_creates_the_blocks() -> McResult<()> {
     let mut document: KdlDocument = "name \"x\"\n\nserver {\n    eula #true\n}\n".parse()?;
 
     document::set_mod_version(&mut document, "lithium", "UPNexAfy")?;
 
     assert_eq!(
         document.to_string(),
-        "name \"x\"\n\nserver {\n    eula #true\n}\n\nmods {\n    lithium \"UPNexAfy\"\n}\n"
+        "name \"x\"\n\nserver {\n    eula #true\n}\n\nmods {\n    modrinth {\n        lithium \"UPNexAfy\"\n    }\n}\n"
     );
 
     Ok(())
@@ -465,7 +556,7 @@ fn set_mod_version_creates_the_block() -> McResult<()> {
 
 #[test]
 fn set_mod_version_replaces_in_place_and_keeps_comments() -> McResult<()> {
-    let source = "mods {\n  // keep me\n  lithium \"AAA\" // trailing\n  carpet \"BBB\" service=\"modrinth\"\n}\n";
+    let source = "mods {\n  modrinth {\n    // keep me\n    lithium \"AAA\" // trailing\n    carpet \"BBB\"\n  }\n}\n";
     let mut document: KdlDocument = source.parse()?;
 
     document::set_mod_version(&mut document, "lithium", "ZZZ")?;
@@ -474,33 +565,34 @@ fn set_mod_version_replaces_in_place_and_keeps_comments() -> McResult<()> {
 
     assert_eq!(
         document.to_string(),
-        "mods {\n  // keep me\n  lithium \"ZZZ\" // trailing\n  carpet \"CCC\" service=\"modrinth\"\n  sodium \"DDD\"\n}\n"
+        "mods {\n  modrinth {\n    // keep me\n    lithium \"ZZZ\" // trailing\n    carpet \"CCC\"\n    sodium \"DDD\"\n  }\n}\n"
     );
 
     Ok(())
 }
 
 #[test]
-fn set_mod_version_turns_a_remote_mod_into_a_versioned_one() -> McResult<()> {
+fn set_mod_version_refuses_a_mod_from_another_source() -> McResult<()> {
     let mut document: KdlDocument =
-        "mods {\n    a url=\"https://example.com/a.jar\"\n}\n".parse()?;
+        "mods {\n    http {\n        a \"https://e.com/a.jar\"\n    }\n}\n".parse()?;
+    let message = error_message(document::set_mod_version(&mut document, "a", "V"));
 
-    document::set_mod_version(&mut document, "a", "V")?;
-
-    assert_eq!(document.to_string(), "mods {\n    a \"V\"\n}\n");
+    assert!(message.contains("already listed under `http`"), "{message}");
 
     Ok(())
 }
 
 #[test]
-fn remove_mod_deletes_only_the_named_node() -> McResult<()> {
-    let mut document: KdlDocument = "mods {\n    a \"1\"\n    b \"2\"\n    c \"3\"\n}\n".parse()?;
+fn remove_mod_searches_every_source() -> McResult<()> {
+    let source = "mods {\n    modrinth {\n        a \"1\"\n        b \"2\"\n    }\n    http {\n        c \"https://e.com/c.jar\"\n    }\n}\n";
+    let mut document: KdlDocument = source.parse()?;
 
     assert!(document::remove_mod(&mut document, "b"));
+    assert!(document::remove_mod(&mut document, "c"));
     assert!(!document::remove_mod(&mut document, "missing"));
     assert_eq!(
         document.to_string(),
-        "mods {\n    a \"1\"\n    c \"3\"\n}\n"
+        "mods {\n    modrinth {\n        a \"1\"\n    }\n    http {\n    }\n}\n"
     );
 
     Ok(())
@@ -542,7 +634,7 @@ fn preset_base_document_is_a_valid_manifest() -> McResult<()> {
          }\n\
          \n\
          backups {\n\
-         \x20   enabled #true\n\
+         \x20   on\n\
          \x20   frequency \"0 0 * * * *\"\n\
          }\n"
     );
@@ -551,13 +643,14 @@ fn preset_base_document_is_a_valid_manifest() -> McResult<()> {
 
     assert_eq!(manifest.name, "demo");
     assert!(manifest.server.eula);
+    assert!(manifest.backups.enabled);
     assert_eq!(manifest.minecraft.loader, Some("fabric".parse()?));
 
     Ok(())
 }
 
 #[test]
-fn preset_with_mods_appends_an_indented_block() -> McResult<()> {
+fn preset_with_mods_appends_grouped_block() -> McResult<()> {
     let mut document = presets::create_document_base("demo", false, "26.2", true);
 
     document::set_mod_version(&mut document, "lithium", "UPNexAfy")?;
@@ -566,7 +659,9 @@ fn preset_with_mods_appends_an_indented_block() -> McResult<()> {
     let text = document.to_string();
 
     assert!(
-        text.ends_with("}\n\nmods {\n    lithium \"UPNexAfy\"\n    carpet \"bGrLxJ8v\"\n}\n"),
+        text.ends_with(
+            "}\n\nmods {\n    modrinth {\n        lithium \"UPNexAfy\"\n        carpet \"bGrLxJ8v\"\n    }\n}\n"
+        ),
         "{text}"
     );
 

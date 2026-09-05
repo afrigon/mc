@@ -1,9 +1,7 @@
-use std::fmt;
-use std::str::FromStr;
-
 use kdl::KdlDocument;
 use url::Url;
 
+use crate::manifest::raw::RawLockfile;
 use crate::utils;
 use crate::utils::errors::McResult;
 use crate::utils::product_descriptor::RawProductDescriptor;
@@ -15,32 +13,28 @@ pub struct ModLockfile {
 
 impl ModLockfile {
     pub fn from_kdl_str(source: &str) -> McResult<ModLockfile> {
-        let document = utils::kdl::parse_document(source)?;
+        let raw: RawLockfile = utils::kdl::deserialize(source)?;
         let mut mods = Vec::new();
 
-        for node in document.nodes() {
-            if node.name().value() != "mod" {
-                anyhow::bail!("unknown node `{}` in the lockfile", node.name().value());
-            }
+        for (name, entry) in raw.modrinth {
+            mods.push(ModLockfileEntry {
+                name,
+                version: entry.version,
+                source: ModLockfileSource::Modrinth,
+                hash: entry.hash
+            });
+        }
 
-            utils::kdl::check_properties(node, &["version", "source", "hash"])?;
-
-            let name = match utils::kdl::arguments(node).as_slice() {
-                [name] => name
-                    .as_string()
-                    .ok_or_else(|| anyhow::anyhow!("the mod name must be a string"))?,
-                _ => anyhow::bail!("a `mod` node takes a single name")
-            };
-
-            let source = utils::kdl::string_property(node, "source")?
-                .ok_or_else(|| anyhow::anyhow!("the mod `{}` has no source", name))?
-                .parse()?;
+        for (name, entry) in raw.http {
+            let url = entry
+                .url
+                .ok_or_else(|| anyhow::anyhow!("the locked mod `{}` has no url", name))?;
 
             mods.push(ModLockfileEntry {
-                name: name.to_owned(),
-                version: utils::kdl::string_property(node, "version")?.map(str::to_owned),
-                source,
-                hash: utils::kdl::string_property(node, "hash")?.map(str::to_owned)
+                name,
+                version: entry.version,
+                source: ModLockfileSource::Url(url),
+                hash: entry.hash
             });
         }
 
@@ -49,24 +43,46 @@ impl ModLockfile {
 
     pub fn to_kdl_document(&self) -> KdlDocument {
         let mut document = KdlDocument::new();
+        let mut modrinth = utils::kdl::node("modrinth", 0);
+        let mut http = utils::kdl::node("http", 0);
 
         for entry in &self.mods {
-            let mut node = utils::kdl::leaf("mod", utils::kdl::quoted(&entry.name), 0);
+            let mut node = utils::kdl::node(&entry.name, 1);
 
-            if let Some(version) = &entry.version {
-                node.push(utils::kdl::quoted_property("version", version));
+            match &entry.source {
+                ModLockfileSource::Modrinth => {
+                    if let Some(version) = &entry.version {
+                        node.push(utils::kdl::quoted_property("version", version));
+                    }
+
+                    if let Some(hash) = &entry.hash {
+                        node.push(utils::kdl::quoted_property("hash", hash));
+                    }
+
+                    modrinth.ensure_children().nodes_mut().push(node);
+                }
+                ModLockfileSource::Url(url) => {
+                    node.push(utils::kdl::quoted_property("url", url.as_str()));
+
+                    if let Some(hash) = &entry.hash {
+                        node.push(utils::kdl::quoted_property("hash", hash));
+                    }
+
+                    http.ensure_children().nodes_mut().push(node);
+                }
             }
+        }
 
-            node.push(utils::kdl::quoted_property(
-                "source",
-                &entry.source.to_string()
-            ));
+        for group in [modrinth, http] {
+            if group.children().is_some() {
+                let mut group = group;
 
-            if let Some(hash) = &entry.hash {
-                node.push(utils::kdl::quoted_property("hash", hash));
+                if !document.nodes().is_empty() {
+                    utils::kdl::add_blank_line_before(&mut group);
+                }
+
+                document.nodes_mut().push(group);
             }
-
-            document.nodes_mut().push(node);
         }
 
         document
@@ -94,37 +110,4 @@ impl ModLockfileEntry {
 pub enum ModLockfileSource {
     Modrinth,
     Url(Url)
-}
-
-impl FromStr for ModLockfileSource {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "modrinth" {
-            return Ok(ModLockfileSource::Modrinth);
-        }
-
-        let (prefix, data) = s
-            .split_once('+')
-            .ok_or_else(|| anyhow::anyhow!("could not parse lockfile source"))?;
-
-        match prefix {
-            "url" => {
-                let url = Url::parse(data)?;
-                Ok(ModLockfileSource::Url(url))
-            }
-            _ => anyhow::bail!("unsupported prefix {} in lockfile source", prefix)
-        }
-    }
-}
-
-impl fmt::Display for ModLockfileSource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            ModLockfileSource::Modrinth => "modrinth".to_string(),
-            ModLockfileSource::Url(url) => format!("url+{}", url)
-        };
-
-        write!(f, "{}", s)
-    }
 }

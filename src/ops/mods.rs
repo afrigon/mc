@@ -136,9 +136,8 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
 
         for name in names {
             let current = match manifest.mods.get(name) {
-                Some(ManifestMod::Version(version)) => version.clone(),
-                Some(ManifestMod::Detailed { version, .. }) => version.clone(),
-                Some(ManifestMod::Remote { .. }) | None => {
+                Some(ManifestMod::Modrinth(version)) => version.clone(),
+                Some(ManifestMod::Http(_)) | None => {
                     _ = context
                         .shell()
                         .status("Skipping", format!("{} (url mods are not versioned)", name));
@@ -343,16 +342,10 @@ pub async fn flatten(
 
     for (name, m) in mods {
         match m {
-            ManifestMod::Version(v) => {
-                queue.push_back((name.clone(), Some(v.clone())));
-            }
-            ManifestMod::Detailed {
-                version,
-                service: _ // TODO: make sure the service is not lost here and hard coded later
-            } => {
+            ManifestMod::Modrinth(version) => {
                 queue.push_back((name.clone(), Some(version.clone())));
             }
-            ManifestMod::Remote { url } => {
+            ManifestMod::Http(url) => {
                 resolved_mods.push(ModLockfileEntry {
                     name: name.clone(),
                     version: None,
