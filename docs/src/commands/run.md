@@ -6,17 +6,26 @@ mc run [OPTIONS]
 
 Brings the instance in line with the manifest, then starts it. Anything
 missing or out of date is installed first: the Java runtime, the Minecraft
-binary, the mod loader, and the mods (added, updated, and removed to match
-the manifest). The generated configuration files are rewritten from the
-manifest on every start.
+binary, the mod loader, the mods (added, updated, and removed to match the
+manifest), and the tunnel agent when a tunnel is configured. The generated
+configuration files are rewritten from the manifest on every start.
 
 Only one running server is allowed per instance directory; a second
 `mc run` refuses to start.
 
-While the instance runs, mc supervises it: the console output is attached to
-the terminal, and scheduled backups fire when enabled — see
-[Backups](../guides/backups.md). The console is not interactive; use the
-remote console (RCON) for live administration.
+While the instance runs, mc supervises it, and scheduled backups fire when
+enabled — see [Backups](../guides/backups.md). The instance's console output
+is hidden unless `--server-logs` is passed; it is always written to
+`instance/logs/` by the server itself. The console is not interactive; use
+the remote console (RCON) for live administration.
+
+With a `tunnel` section, the tunnel agent starts beside the instance and
+is restarted if it stops on its own; the public address is printed at
+startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
+goes to `.tunnel/playitd.log` otherwise. The first start from a terminal prints a claim link to approve in a
+browser and saves the resulting secret under `.tunnel/`. Without a terminal
+and without a secret, `mc run` fails with instructions rather than waiting —
+see [Tunnels](../guides/tunnel.md).
 
 ## Stopping
 
@@ -42,3 +51,5 @@ instance's exit code.
 
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
+- `--server-logs` — show the instance's console output in the terminal.
+- `--tunnel-logs` — show the tunnel agent's output in the terminal.

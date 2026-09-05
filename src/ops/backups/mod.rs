@@ -189,7 +189,7 @@ impl FromKdlNode for BackupStorage {
                 Ok(BackupStorage::Local {
                     path: utils::kdl::string_property(node, "path")?
                         .map(PathBuf::from)
-                        .unwrap_or_else(|| PathBuf::from("backups")),
+                        .ok_or_else(|| anyhow::anyhow!("local storage requires a `path`"))?,
                     keep: utils::kdl::integer_property(node, "keep")?.unwrap_or(20)
                 })
             }

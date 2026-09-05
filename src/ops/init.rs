@@ -8,28 +8,12 @@ use crate::manifest::presets::ManifestPreset;
 use crate::utils;
 use crate::utils::errors::McResult;
 
-pub struct InitDirectoriesOptions {
-    pub path: PathBuf
-}
-
-pub async fn init_directories(
-    _context: &mut McContext,
-    options: &InitDirectoriesOptions
-) -> McResult<()> {
-    tokio::try_join!(
-        tokio::fs::create_dir_all(options.path.join(".minecraft")),
-        tokio::fs::create_dir_all(options.path.join(".java")),
-        tokio::fs::create_dir_all(options.path.join("instance"))
-    )?;
-
-    Ok(())
-}
-
 const GITIGNORE: &str = "\
 .DS_Store
 
 /.java
 /.minecraft
+/.tunnel
 /instance
 /temp
 
@@ -120,11 +104,6 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
     tokio::fs::write(manifest_path, manifest.to_string()).await?;
 
     write_gitignore(context, path).await?;
-
-    let init_directories_options = InitDirectoriesOptions {
-        path: options.path.clone()
-    };
-    init_directories(context, &init_directories_options).await?;
 
     context.shell().note("see more `mc.kdl` keys and their definitions at https://doc.mc.frigon.app/reference/manifest.html")?;
 

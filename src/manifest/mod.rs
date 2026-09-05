@@ -31,6 +31,8 @@ use crate::ops::notifications::NotifierConfiguration;
 use crate::resolvers::java::JavaVersionResolver;
 use crate::resolvers::loader::LoaderVersionResolver;
 use crate::resolvers::minecraft::MinecraftVersionResolver;
+use crate::resolvers::tunnel::TunnelVersionResolver;
+use crate::tunnel::TunnelDescriptor;
 use crate::utils;
 use crate::utils::errors::McResult;
 use crate::utils::product_descriptor::ProductDescriptor;
@@ -49,7 +51,8 @@ pub struct Manifest {
     pub server: ManifestServer,
     pub mods: HashMap<String, ManifestMod>,
     pub backups: ManifestBackups,
-    pub notifications: ManifestNotifications
+    pub notifications: ManifestNotifications,
+    pub tunnel: Option<ManifestTunnel>
 }
 
 impl Manifest {
@@ -67,7 +70,8 @@ impl Manifest {
                 "server",
                 "mods",
                 "backups",
-                "notifications"
+                "notifications",
+                "tunnel"
             ]
         )?;
 
@@ -84,7 +88,12 @@ impl Manifest {
             server: section(&document, "server")?,
             mods: mods_section(&document)?,
             backups: section(&document, "backups")?,
-            notifications: section(&document, "notifications")?
+            notifications: section(&document, "notifications")?,
+            tunnel: document
+                .get("tunnel")
+                .map(ManifestTunnel::from_kdl_node)
+                .transpose()
+                .context("invalid `tunnel` section")?
         })
     }
 
@@ -308,6 +317,43 @@ impl FromKdlNode for ManifestJava {
         }
 
         Ok(java)
+    }
+}
+
+pub struct ManifestTunnel {
+    pub provider: RawProductDescriptor
+}
+
+impl ManifestTunnel {
+    pub async fn provider_descriptor(&self, context: &McContext) -> McResult<TunnelDescriptor> {
+        TunnelVersionResolver::resolve_descriptor(context, &self.provider).await
+    }
+}
+
+impl Default for ManifestTunnel {
+    fn default() -> Self {
+        ManifestTunnel {
+            provider: RawProductDescriptor {
+                product: String::from("playit"),
+                version: None
+            }
+        }
+    }
+}
+
+impl FromKdlNode for ManifestTunnel {
+    fn from_kdl_node(node: &KdlNode) -> McResult<Self> {
+        let mut tunnel = ManifestTunnel::default();
+
+        let Some(children) = children(node, &["provider"])? else {
+            return Ok(tunnel);
+        };
+
+        if let Some(provider) = children.get("provider") {
+            tunnel.provider = utils::kdl::parse_argument(provider)?;
+        }
+
+        Ok(tunnel)
     }
 }
 

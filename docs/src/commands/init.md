@@ -4,10 +4,9 @@
 mc init [OPTIONS] [PATH]
 ```
 
-Creates a new instance: a `mc.kdl` manifest, a `.gitignore`, and the
-supporting directories. `PATH` defaults to the current directory and is
-created if it does not exist. The command refuses to run where a `mc.kdl`
-already exists.
+Creates a new instance: a `mc.kdl` manifest and a `.gitignore`. `PATH`
+defaults to the current directory and is created if it does not exist. The
+command refuses to run where a `mc.kdl` already exists.
 
 The generated `.gitignore` excludes runtime state — the installed JDKs and
 Minecraft binaries, the live server directory, scratch space, and run-time

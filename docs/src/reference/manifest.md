@@ -37,6 +37,7 @@ mods {
 backups {
     enabled #true
     frequency "0 0 * * * *"
+    storage "local" path="backups" keep=20
 }
 ```
 
@@ -88,6 +89,24 @@ The Minecraft version and mod loader.
   a loader and the `mods` block is ignored. Run
   [`mc minecraft list-loaders`](../commands/minecraft.md) to see loader
   versions.
+
+## `tunnel`
+
+Exposes the instance to players outside the local network through a tunnel
+provider; see the [Tunnels](../guides/tunnel.md) guide. The section is
+opt-in: when it is absent, no tunnel agent is installed or started.
+
+- `provider` — the tunnel provider, as a `name` or `name@version`
+  descriptor. `playit` is the accepted provider. Defaults to `"playit"`,
+  which resolves to the latest agent version on every start; pin an exact
+  version, such as `"playit@1.0.10"`, to hold it. Run
+  [`mc tunnel list`](../commands/tunnel.md) to see the available versions.
+
+```kdl
+tunnel {
+    provider "playit"
+}
+```
 
 ## `server`
 
@@ -184,6 +203,9 @@ Scheduled world backups, taken while the instance runs.
   `#false`. Manual [`mc backup`](../commands/backup.md) works regardless.
 - `frequency` — a cron expression with six fields: seconds, minutes, hours,
   day of month, month, day of week. Defaults to `"0 0 * * * *"` (hourly).
+- `storage` — where archives are stored; see below. When the node is
+  omitted, archives go to local storage under `backups`, keeping the 20 most
+  recent.
 
 ### `storage`
 
@@ -191,7 +213,7 @@ Where archives are stored. The first value selects the backend:
 
 ```kdl
 backups {
-    // path and keep shown at their defaults
+    // path is required once the node is written; keep shown at its default
     storage "local" path="backups" keep=20
 }
 ```
@@ -202,10 +224,10 @@ backups {
 }
 ```
 
-For `local`, `keep` is the number of most-recent automatic archives to keep.
-For `s3`, the bucket may also come from the `MC_BACKUPS_S3_BUCKET`
-environment variable, and credentials come from the standard AWS credential
-chain. The default is local storage.
+For `local`, `path` is required and `keep` is the number of most-recent
+automatic archives to keep. For `s3`, the bucket may also come from the
+`MC_BACKUPS_S3_BUCKET` environment variable, and credentials come from the
+standard AWS credential chain. The default is local storage.
 
 See the [Backups](../guides/backups.md) guide for the full picture.
 
@@ -217,7 +239,8 @@ Discord) — the URL is a secret and is never read from the manifest, and
 without one no notifications are sent. This block selects which events are
 reported; every key defaults to `#true`:
 
-- `on-lifecycle-event` — the instance started or stopped.
+- `on-lifecycle-event` — the instance started or stopped. When a tunnel is
+  configured, the started message includes the address to join at.
 - `on-panic` — the instance crashed.
 - `on-sigkill` — the instance was forced down without a clean save, because
   it did not stop within the grace period or a second stop signal arrived.

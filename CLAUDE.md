@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-`rustfmt.toml` uses `unstable_features`, so formatting needs nightly rustfmt (`cargo +nightly fmt`). Releases are tag-driven (`v*`) via `.github/workflows/deploy.yml`, cross-compiling to Linux/Windows/macOS.
+Tools and tasks are defined in `mise.toml`: `mise run build`, `mise run test`, `mise run docs`. `rustfmt.toml` uses `unstable_features`, so formatting needs nightly rustfmt; `mise run format` runs it on the pinned nightly. Releases are tag-driven (`v*`) via `.github/workflows/deploy.yml`, cross-compiling to Linux/Windows/macOS; `.github/workflows/pull_request.yml` runs the tests on pull requests.
 
 ## Documentation
 

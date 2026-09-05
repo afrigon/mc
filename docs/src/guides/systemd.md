@@ -18,7 +18,7 @@ Wants=network-online.target
 [Service]
 User=minecraft
 WorkingDirectory=/srv/minecraft/myserver
-ExecStart=/usr/local/bin/mc run
+ExecStart=/usr/local/bin/mc run --server-logs
 EnvironmentFile=/etc/minecraft/myserver.env
 Restart=on-failure
 
@@ -64,8 +64,9 @@ stopped.
 
 ## Logs
 
-The instance's console output goes to standard output, which systemd
-captures in the journal:
+With `--server-logs`, the instance's console output goes to standard output,
+which systemd captures in the journal (add `--tunnel-logs` to capture the
+tunnel agent as well):
 
 ```console
 $ journalctl -u myserver -f

@@ -27,14 +27,24 @@ pub struct RunCommand {
         hide_default_value = true,
         value_name = "PATH"
     )]
-    pub lockfile_path: PathBuf
+    pub lockfile_path: PathBuf,
+
+    /// Show the Minecraft server console output
+    #[arg(long)]
+    pub server_logs: bool,
+
+    /// Show the tunnel agent output
+    #[arg(long)]
+    pub tunnel_logs: bool
 }
 
 impl CommandHandler for RunCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = RunOptions {
             manifest_path: self.manifest_path.clone(),
-            lockfile_path: self.lockfile_path.clone()
+            lockfile_path: self.lockfile_path.clone(),
+            server_logs: self.server_logs,
+            tunnel_logs: self.tunnel_logs
         };
 
         let exit_status = ops::run::run(context, &options).await?;

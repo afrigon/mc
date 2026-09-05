@@ -1,8 +1,10 @@
 # Environment Variables
 
-The environment acts as an override layer on top of `mc.kdl`, and is the
-only place mc reads secrets from — secrets are deliberately kept out of the
-manifest so it can be committed and shared safely.
+The environment acts as an override layer on top of `mc.kdl`. Secrets are
+deliberately kept out of the manifest so it can be committed and shared
+safely: mc reads them from the environment, or from files it generates
+readable only by the owning user (see [Instance
+Layout](./instance-layout.md)).
 
 ## `MC_RCON_PASSWORD`
 

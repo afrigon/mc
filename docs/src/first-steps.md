@@ -83,5 +83,6 @@ before they can join. To open the instance to everyone instead, set
 - add or update mods with [`mc add`](./commands/add.md) and
   [`mc update`](./commands/update.md) — see [Managing Mods](./guides/mods.md)
 - configure world [Backups](./guides/backups.md)
+- let players outside your network join — see [Tunnels](./guides/tunnel.md)
 - deploy the instance as a service — see
   [Running under systemd](./guides/systemd.md)

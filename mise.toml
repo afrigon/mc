@@ -1,0 +1,32 @@
+[settings]
+lockfile = true
+
+[tools]
+rust = "1.98"
+mdbook = "0.5"
+
+[tasks.build]
+description = "Build in release mode"
+run = "cargo build --release --locked"
+
+[tasks.mc]
+description = "Build and run mc"
+run = "cargo run"
+
+[tasks.test]
+description = "Run the test suite"
+run = "cargo test --locked"
+
+[tasks.format]
+description = "Format with the nightly rustfmt the rustfmt.toml requires"
+tools = { rust = "nightly-2026-08-31" }
+run = "cargo fmt"
+
+[tasks.cross]
+description = "Cross-compile in release mode through cross"
+tools = { "ubi:cross-rs/cross" = "0.2" }
+run = "cross build --release --locked"
+
+[tasks.docs]
+description = "Build the documentation book"
+run = "mdbook build docs"

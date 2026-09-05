@@ -11,6 +11,7 @@ mod network;
 mod ops;
 mod resolvers;
 mod services;
+mod tunnel;
 mod utils;
 
 use std::process::exit;
@@ -23,6 +24,7 @@ use crate::cli::CommandHandler;
 use crate::cli::commands::CliCommand;
 use crate::cli::commands::java::JavaSubcommand;
 use crate::cli::commands::minecraft::MinecraftSubcommand;
+use crate::cli::commands::tunnel::TunnelSubcommand;
 use crate::context::McContext;
 use crate::utils::errors::CliError;
 use crate::utils::errors::CliResult;
@@ -99,6 +101,11 @@ async fn run(cli: &Cli, context: &mut McContext) -> CliResult {
         CliCommand::Java(command) => match &command.command {
             JavaSubcommand::Install(command) => command.handle(context).await,
             JavaSubcommand::List(command) => command.handle(context).await
+        },
+        CliCommand::Tunnel(command) => match &command.command {
+            TunnelSubcommand::Install(command) => command.handle(context).await,
+            TunnelSubcommand::List(command) => command.handle(context).await,
+            TunnelSubcommand::Claim(command) => command.handle(context).await
         },
         CliCommand::Add(command) => command.handle(context).await,
         CliCommand::Remove(command) => command.handle(context).await,

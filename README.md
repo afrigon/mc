@@ -30,6 +30,18 @@ mc run
 Passing `--eula` indicates you have read and agree to the
 [Minecraft EULA](https://aka.ms/MinecraftEULA).
 
+## Development
+
+Tools are pinned with [mise](https://mise.jdx.dev); `mise install` sets up
+the toolchain, then:
+
+```sh
+mise run build     # release build
+mise run test      # test suite
+mise run format    # rustfmt, on the nightly the config requires
+mise run docs      # build the documentation book
+```
+
 ## Documentation
 
 Full documentation is available at

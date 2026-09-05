@@ -75,6 +75,10 @@ notifications {
     on-lifecycle-event #false
     on-backup #false
 }
+
+tunnel {
+    provider "playit@1.0.10"
+}
 "#;
 
 fn error_message<T>(result: McResult<T>) -> String {
@@ -177,6 +181,11 @@ fn full_manifest_decodes() -> McResult<()> {
     assert!(manifest.notifications.on_panic);
     assert!(manifest.notifications.on_sigkill);
 
+    assert_eq!(
+        manifest.tunnel.map(|tunnel| tunnel.provider),
+        Some("playit@1.0.10".parse()?)
+    );
+
     Ok(())
 }
 
@@ -207,8 +216,34 @@ fn minimal_manifest_uses_defaults() -> McResult<()> {
         BackupStorage::Local { path, keep: 20 } if path.to_str() == Some("backups")
     ));
     assert!(manifest.notifications.on_sigkill);
+    assert!(manifest.tunnel.is_none());
 
     Ok(())
+}
+
+#[test]
+fn tunnel_section_without_provider_uses_the_default_provider() -> McResult<()> {
+    for source in [with_section("tunnel"), with_section("tunnel {\n}")] {
+        let manifest = Manifest::from_kdl_str(&source)?;
+
+        assert_eq!(
+            manifest.tunnel.map(|tunnel| tunnel.provider),
+            Some("playit".parse()?)
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn local_storage_requires_a_path() {
+    let source = with_section("backups {\n    storage \"local\" keep=3\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("local storage requires a `path`"),
+        "{message}"
+    );
 }
 
 #[test]
