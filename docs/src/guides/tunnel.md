@@ -30,7 +30,7 @@ $ mc run
     Claiming tunnel agent, approve it at https://playit.gg/claim/... with your playit.gg account
      Claimed tunnel agent secret saved to .tunnel/playit.toml
     Creating a Minecraft tunnel for port 25565
-      Tunnel quiet-fox.joinmc.link
+      Tunnel players can join at quiet-fox.joinmc.link
 ```
 
 Opening the link in a browser, signed in to the provider, approves the agent

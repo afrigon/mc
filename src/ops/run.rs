@@ -325,7 +325,9 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
         match ops::tunnel::ensure(context, &tunnel_ensure_options).await {
             Ok(Some(address)) => {
-                _ = context.shell().status("Tunnel", &address);
+                _ = context
+                    .shell()
+                    .status("Tunnel", format!("players can join at {}", address));
                 tunnel_address = Some(address);
             }
             Ok(None) => {
