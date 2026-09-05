@@ -8,23 +8,6 @@ use crate::manifest::presets::ManifestPreset;
 use crate::utils;
 use crate::utils::errors::McResult;
 
-pub struct InitDirectoriesOptions {
-    pub path: PathBuf
-}
-
-pub async fn init_directories(
-    _context: &mut McContext,
-    options: &InitDirectoriesOptions
-) -> McResult<()> {
-    tokio::try_join!(
-        tokio::fs::create_dir_all(options.path.join(".minecraft")),
-        tokio::fs::create_dir_all(options.path.join(".java")),
-        tokio::fs::create_dir_all(options.path.join("instance"))
-    )?;
-
-    Ok(())
-}
-
 const GITIGNORE: &str = "\
 .DS_Store
 
