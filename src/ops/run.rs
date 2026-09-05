@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
 use tokio_util::sync::CancellationToken;
@@ -61,26 +60,6 @@ fn has_jvm_property(arguments: &[String], property: &str) -> bool {
     arguments
         .iter()
         .any(|argument| argument.starts_with(&prefix))
-}
-
-fn sanitize_command(command: &Command) -> String {
-    let command = command.as_std();
-
-    let mut command_parts: Vec<String> = Vec::new();
-    command_parts.push(command.get_program().to_string_lossy().into_owned());
-    command_parts.extend(command.get_args().map(|a| a.to_string_lossy().into_owned()));
-
-    command_parts
-        .into_iter()
-        .map(|s| {
-            if s.contains(" ") || s.contains("\t") {
-                format!("{:?}", s)
-            } else {
-                s
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 // TODO: validate error context for all cases.
@@ -389,7 +368,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     utils::process::detach_from_terminal_signals(&mut command);
 
-    let command_string = sanitize_command(&command);
+    let command_string = utils::process::render_command(&command);
     _ = context
         .shell()
         .status("Running", format!("`{}`", command_string));
@@ -570,6 +549,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if let Some(tunnel_handle) = tunnel_handle {
         let _ = tunnel_handle.await;
+
+        _ = context.shell().status("Stopped", "the tunnel agent");
     }
 
     if let Some(ref notifier) = notifier {

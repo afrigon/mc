@@ -10,7 +10,6 @@ use std::time::Instant;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
-use tokio::process::Child;
 use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -37,6 +36,8 @@ pub const SECRET_FILE_NAME: &'static str = "playit.toml";
 const CLAIM_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const CLAIM_TIMEOUT: Duration = Duration::from_secs(600);
 const AGENT_RESTART_DELAY: Duration = Duration::from_secs(5);
+const TUNNEL_ALLOCATION_POLL_INTERVAL: Duration = Duration::from_secs(3);
+const TUNNEL_ALLOCATION_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub fn agent_path(
     tunnel_directory: &Path,
@@ -280,15 +281,25 @@ pub async fn ensure(
 
     playit_api::create_tunnel(&context.http_client, &options.secret, &request).await?;
 
-    let run_data = playit_api::get_run_data(&context.http_client, &options.secret).await?;
+    // A fresh tunnel is reported as pending until playit allocates it, which
+    // usually takes a few seconds.
+    let deadline = Instant::now() + TUNNEL_ALLOCATION_TIMEOUT;
 
-    Ok(run_data
-        .tunnels
-        .iter()
-        .find(|tunnel| {
+    loop {
+        tokio::time::sleep(TUNNEL_ALLOCATION_POLL_INTERVAL).await;
+
+        let run_data = playit_api::get_run_data(&context.http_client, &options.secret).await?;
+
+        if let Some(tunnel) = run_data.tunnels.iter().find(|tunnel| {
             is_minecraft(&tunnel.tunnel_type) && tunnel.local_port == options.server_port
-        })
-        .map(|tunnel| tunnel.address()))
+        }) {
+            return Ok(Some(tunnel.address()));
+        }
+
+        if Instant::now() > deadline {
+            return Ok(None);
+        }
+    }
 }
 
 pub struct TunnelAgentOptions {
@@ -298,7 +309,7 @@ pub struct TunnelAgentOptions {
     pub log_level: &'static str
 }
 
-fn spawn_agent(options: &TunnelAgentOptions) -> McResult<Child> {
+fn agent_command(options: &TunnelAgentOptions) -> Command {
     let mut command = Command::new(&options.agent_path);
 
     command
@@ -315,7 +326,7 @@ fn spawn_agent(options: &TunnelAgentOptions) -> McResult<Child> {
 
     utils::process::detach_from_terminal_signals(&mut command);
 
-    command.spawn().context("could not start the tunnel agent")
+    command
 }
 
 fn warn(shell: &Arc<Mutex<Shell>>, message: String) {
@@ -333,13 +344,20 @@ pub fn supervise(
     cancel: CancellationToken
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let mut command = agent_command(&options);
+
+        _ = shell.lock().unwrap_or_else(PoisonError::into_inner).status(
+            "Running",
+            format!("`{}`", utils::process::render_command(&command))
+        );
+
         loop {
-            let mut child = match spawn_agent(&options) {
+            let mut child = match command.spawn() {
                 Ok(child) => child,
                 Err(error) => {
                     warn(
                         &shell,
-                        format!("could not start the tunnel agent: {:?}", error)
+                        format!("could not start the tunnel agent: {}", error)
                     );
                     return;
                 }
