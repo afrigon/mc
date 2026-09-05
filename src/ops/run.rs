@@ -49,6 +49,14 @@ const SECRET_PROPERTY_KEYS: [&str; 3] = [
     "rcon.password"
 ];
 
+// A terminal echoes the interrupt as `^C` on the current line; the next
+// status line starts fresh so it stays in its column.
+fn skip_echoed_signal() {
+    if std::io::stderr().is_terminal() {
+        eprintln!();
+    }
+}
+
 pub struct RunOptions {
     pub manifest_path: PathBuf,
     pub lockfile_path: PathBuf,
@@ -507,6 +515,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             // without waiting on it.
             backup_cancel.cancel();
 
+            skip_echoed_signal();
+
             _ = context
                 .shell()
                 .status("Stopping", "asking the server to save and shut down");
@@ -545,6 +555,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     _ = context.shell().status("Stopped", "the server was forced down");
                 }
                 _ = shutdown.recv() => {
+                    skip_echoed_signal();
+
                     _ = context
                         .shell()
                         .warn("received a second signal, forcing the server down");
