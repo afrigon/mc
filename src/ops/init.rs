@@ -122,11 +122,6 @@ pub async fn init(context: &mut McContext, options: &InitOptions) -> McResult<()
 
     write_gitignore(context, path).await?;
 
-    let init_directories_options = InitDirectoriesOptions {
-        path: options.path.clone()
-    };
-    init_directories(context, &init_directories_options).await?;
-
     context.shell().note("see more `mc.toml` keys and their definitions at https://doc.mc.frigon.app/reference/manifest.html")?;
 
     Ok(())
