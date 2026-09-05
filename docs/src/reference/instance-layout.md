@@ -9,6 +9,9 @@ myserver/
 ├── mc.lock
 ├── .java/
 ├── .minecraft/
+├── .tunnel/
+│   ├── playit.toml
+│   └── playitd.log
 ├── backups/
 ├── instance/
 │   ├── eula.txt
@@ -37,6 +40,20 @@ instance starts.
 Installed Java runtimes and Minecraft binaries, keyed by version, shared by
 every start of this instance. Safe to delete while the instance is stopped;
 whatever is missing is downloaded again on the next start.
+
+## `.tunnel/`
+
+Present when the manifest has a `[tunnel]` section. Holds the installed
+tunnel agents, keyed by version like `.java/`, the agent's log in
+`playitd.log` when its output is not shown in the terminal, and
+`playit.toml`, the secret that links the agent to a tunnel provider account. The secret file is
+created readable only by the owning user when the agent is first claimed,
+and mc refuses to start if its permissions have been loosened. Deleting it
+makes the next start claim a new agent; `mc tunnel claim --force` does the
+same on demand. See [Tunnels](../guides/tunnel.md).
+
+Instances created before tunnels existed have no `/.tunnel` entry in their
+`.gitignore`; add one before committing.
 
 ## `backups/`
 

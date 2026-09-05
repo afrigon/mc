@@ -7,3 +7,5 @@ Task-oriented guides for operating an instance:
   restoring from them.
 - [Running under systemd](./guides/systemd.md) — deploy an instance as a
   supervised service.
+- [Tunnels](./guides/tunnel.md) — let players join from outside the local
+  network without forwarding ports.

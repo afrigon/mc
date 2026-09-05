@@ -10,4 +10,5 @@
   [`mc restore`](./commands/restore.md).
 - [Installation Commands](./commands/installation.md) — inspect and
   pre-install runtimes and versions: [`mc java`](./commands/java.md),
-  [`mc minecraft`](./commands/minecraft.md).
+  [`mc minecraft`](./commands/minecraft.md),
+  [`mc tunnel`](./commands/tunnel.md).

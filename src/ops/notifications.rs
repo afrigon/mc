@@ -31,7 +31,7 @@ impl NotificationKind {
 }
 
 pub enum ServerEvent {
-    Started,
+    Started { tunnel_address: Option<String> },
     Stopped,
     Crashed(ExitStatus),
     Sigkill
@@ -89,8 +89,11 @@ impl Notifier {
 
     pub async fn notify_server(&self, name: &str, event: &ServerEvent) {
         let message = match event {
-            ServerEvent::Started if self.configuration.on_lifecycle_event => {
-                format!("🟢 `{}` started", name)
+            ServerEvent::Started { tunnel_address } if self.configuration.on_lifecycle_event => {
+                match tunnel_address {
+                    Some(address) => format!("🟢 `{}` started, join at `{}`", name, address),
+                    None => format!("🟢 `{}` started", name)
+                }
             }
             ServerEvent::Stopped if self.configuration.on_lifecycle_event => {
                 format!("🔴 `{}` stopped", name)

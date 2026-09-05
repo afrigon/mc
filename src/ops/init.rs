@@ -30,6 +30,7 @@ const GITIGNORE: &str = "\
 
 /.java
 /.minecraft
+/.tunnel
 /instance
 /temp
 

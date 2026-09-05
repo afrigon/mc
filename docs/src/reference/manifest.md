@@ -31,6 +31,9 @@ lithium = "..."
 [backups]
 enabled = true
 frequency = "0 0 * * * *"
+
+[tunnel]
+provider = "playit"
 ```
 
 ## `name` (required)
@@ -80,6 +83,23 @@ The Minecraft version and mod loader.
   a loader and the `[mods]` table is ignored. Run
   [`mc minecraft list-loaders`](../commands/minecraft.md) to see loader
   versions.
+
+## `[tunnel]`
+
+Exposes the instance to players outside the local network through a tunnel
+provider; see the [Tunnels](../guides/tunnel.md) guide. The section is
+opt-in: when it is absent, no tunnel agent is installed or started.
+
+- `provider` — the tunnel provider, as a `name` or `name@version`
+  descriptor. `playit` is the accepted provider. Defaults to `"playit"`,
+  which resolves to the latest agent version on every start; pin an exact
+  version, such as `"playit@1.0.10"`, to hold it. Run
+  [`mc tunnel list`](../commands/tunnel.md) to see the available versions.
+
+```toml
+[tunnel]
+provider = "playit"
+```
 
 ## `[server]`
 
@@ -203,7 +223,8 @@ Discord) — the URL is a secret and is never read from the manifest, and
 without one no notifications are sent. This table selects which events are
 reported; every key defaults to `true`:
 
-- `on_lifecycle_event` — the instance started or stopped.
+- `on_lifecycle_event` — the instance started or stopped. When a tunnel is
+  configured, the started message includes the address to join at.
 - `on_panic` — the instance crashed.
 - `on_sigkill` — the instance was forced down without a clean save, because
   it did not stop within the grace period or a second stop signal arrived.

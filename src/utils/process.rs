@@ -16,6 +16,26 @@ use crate::utils::errors::McResult;
 #[cfg(windows)]
 const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 
+pub fn render_command(command: &Command) -> String {
+    let command = command.as_std();
+
+    let mut command_parts: Vec<String> = Vec::new();
+    command_parts.push(command.get_program().to_string_lossy().into_owned());
+    command_parts.extend(command.get_args().map(|a| a.to_string_lossy().into_owned()));
+
+    command_parts
+        .into_iter()
+        .map(|s| {
+            if s.contains(" ") || s.contains("\t") {
+                format!("{:?}", s)
+            } else {
+                s
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 pub fn detach_from_terminal_signals(command: &mut Command) {
     #[cfg(unix)]
     command.process_group(0);

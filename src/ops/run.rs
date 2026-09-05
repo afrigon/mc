@@ -1,6 +1,6 @@
 use std::env;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
@@ -9,7 +9,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Command;
 use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
 use tokio_util::sync::CancellationToken;
@@ -30,6 +29,11 @@ use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
 use crate::ops::notifications::ServerEvent;
+use crate::ops::tunnel::TunnelAgentOptions;
+use crate::ops::tunnel::TunnelClaimOptions;
+use crate::ops::tunnel::TunnelEnsureOptions;
+use crate::ops::tunnel::TunnelInstallOptions;
+use crate::services::playit_api::DASHBOARD_TUNNELS_URL;
 use crate::utils;
 use crate::utils::errors::McResult;
 
@@ -45,74 +49,27 @@ const SECRET_PROPERTY_KEYS: [&str; 3] = [
     "rcon.password"
 ];
 
+// A terminal echoes the interrupt as `^C` on the current line; the next
+// status line starts fresh so it stays in its column.
+fn skip_echoed_signal() {
+    if std::io::stderr().is_terminal() {
+        eprintln!();
+    }
+}
+
 pub struct RunOptions {
     pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf
+    pub lockfile_path: PathBuf,
+    pub server_logs: bool,
+    pub tunnel_logs: bool
 }
 
-// server.properties can hold plaintext secrets, so it is created readable only
-// by the user running the server.
-#[cfg(unix)]
-async fn write_server_properties(
-    context: &mut McContext,
-    path: &Path,
-    contents: &str,
-    contains_secrets: bool
-) -> McResult<()> {
-    use std::os::unix::fs::PermissionsExt;
-
-    match tokio::fs::metadata(path).await {
-        Ok(metadata) => {
-            let mode = metadata.permissions().mode();
-
-            if mode & 0o077 != 0 {
-                if contains_secrets {
-                    anyhow::bail!(
-                        "{} is accessible to other users (mode {:03o}) and holds secrets such as the rcon password; fix it with `chmod 600 {}`",
-                        path.display(),
-                        mode & 0o777,
-                        path.display()
-                    );
-                }
-
-                _ = context.shell().warn(format!(
-                    "{} is accessible to other users (mode {:03o}); fix it with `chmod 600 {}`",
-                    path.display(),
-                    mode & 0o777,
-                    path.display()
-                ));
-            }
-        }
-        Err(error) if error.kind() == ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(error).context("could not inspect the server.properties permissions");
-        }
+fn child_output(shown: bool) -> Stdio {
+    if shown {
+        Stdio::inherit()
+    } else {
+        Stdio::null()
     }
-
-    let mut file = tokio::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)
-        .await?;
-
-    file.write_all(contents.as_bytes()).await?;
-    file.flush().await?;
-
-    Ok(())
-}
-
-#[cfg(not(unix))]
-async fn write_server_properties(
-    _context: &mut McContext,
-    path: &Path,
-    contents: &str,
-    _contains_secrets: bool
-) -> McResult<()> {
-    tokio::fs::write(path, contents).await?;
-
-    Ok(())
 }
 
 fn has_jvm_property(arguments: &[String], property: &str) -> bool {
@@ -121,26 +78,6 @@ fn has_jvm_property(arguments: &[String], property: &str) -> bool {
     arguments
         .iter()
         .any(|argument| argument.starts_with(&prefix))
-}
-
-fn sanitize_command(command: &Command) -> String {
-    let command = command.as_std();
-
-    let mut command_parts: Vec<String> = Vec::new();
-    command_parts.push(command.get_program().to_string_lossy().into_owned());
-    command_parts.extend(command.get_args().map(|a| a.to_string_lossy().into_owned()));
-
-    command_parts
-        .into_iter()
-        .map(|s| {
-            if s.contains(" ") || s.contains("\t") {
-                format!("{:?}", s)
-            } else {
-                s
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 // TODO: validate error context for all cases.
@@ -311,7 +248,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             .is_some_and(|value| !value.is_empty())
     });
 
-    write_server_properties(
+    utils::private_file::write_private_file(
         context,
         &instance_path.join("server.properties"),
         &ServerProperties::entries_to_string(&property_entries)?,
@@ -331,10 +268,6 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     ops::mods::sync(context, &sync_options, &manifest.mods).await?;
 
-    // PROCESS
-
-    let mut command = tokio::process::Command::new(java_bin_path);
-
     let server_log_level = match context.log_level {
         tracing::Level::ERROR => "error",
         tracing::Level::WARN => "warn",
@@ -342,6 +275,83 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         tracing::Level::DEBUG => "debug",
         tracing::Level::TRACE => "trace"
     };
+
+    // TUNNEL
+
+    let tunnel_directory = path.join(".tunnel");
+    let mut tunnel_address = None;
+    let mut tunnel_agent = None;
+
+    if let Some(ref tunnel) = manifest.tunnel {
+        let tunnel_descriptor = tunnel.provider_descriptor(context).await?;
+        let agent_path =
+            ops::tunnel::agent_path(&tunnel_directory, &tunnel_descriptor, current_platform);
+
+        if !agent_path.exists() {
+            let tunnel_install_options = TunnelInstallOptions {
+                version: tunnel_descriptor,
+                platform: current_platform,
+                architecture: Architecture::current(),
+                tunnel_directory: tunnel_directory.clone(),
+                staging_directory: staging_path.clone()
+            };
+
+            ops::tunnel::install(context, &tunnel_install_options).await?;
+        }
+
+        let secret_path = ops::tunnel::secret_path(&tunnel_directory);
+
+        if !secret_path.exists() {
+            if !std::io::stdin().is_terminal() {
+                anyhow::bail!(
+                    "no tunnel agent secret at `{}`; run `mc tunnel claim` (or `mc run`) from a terminal once to claim this instance's agent",
+                    secret_path.display()
+                );
+            }
+
+            let tunnel_claim_options = TunnelClaimOptions {
+                secret_path: secret_path.clone(),
+                force: false
+            };
+
+            ops::tunnel::claim(context, &tunnel_claim_options).await?;
+        }
+
+        let tunnel_ensure_options = TunnelEnsureOptions {
+            secret: ops::tunnel::read_secret(&secret_path).await?,
+            server_port: manifest.server.port,
+            name: manifest.name.clone()
+        };
+
+        match ops::tunnel::ensure(context, &tunnel_ensure_options).await {
+            Ok(Some(address)) => tunnel_address = Some(address),
+            Ok(None) => {
+                _ = context.shell().warn(format!(
+                    "the tunnel is still being set up by playit.gg; check {}",
+                    DASHBOARD_TUNNELS_URL
+                ));
+            }
+            Err(error) => {
+                _ = context.shell().warn(format!(
+                    "could not set up the tunnel: {:?}; create a Minecraft Java tunnel for port {} at {}",
+                    error, manifest.server.port, DASHBOARD_TUNNELS_URL
+                ));
+            }
+        }
+
+        tunnel_agent = Some(TunnelAgentOptions {
+            agent_path,
+            work_directory: tunnel_directory,
+            socket_path: ops::tunnel::socket_path(&manifest.name),
+            log_level: server_log_level,
+            logs: options.tunnel_logs,
+            address: tunnel_address.clone()
+        });
+    }
+
+    // PROCESS
+
+    let mut command = tokio::process::Command::new(java_bin_path);
 
     command.args(manifest.java.args());
 
@@ -369,13 +379,13 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .arg("--nogui")
         .current_dir(&instance_path)
         .stdin(Stdio::piped())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
+        .stdout(child_output(options.server_logs))
+        .stderr(child_output(options.server_logs))
         .kill_on_drop(true);
 
     utils::process::detach_from_terminal_signals(&mut command);
 
-    let command_string = sanitize_command(&command);
+    let command_string = utils::process::render_command(&command);
     _ = context
         .shell()
         .status("Running", format!("`{}`", command_string));
@@ -384,11 +394,20 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let mut shutdown = utils::process::ShutdownSignals::register()?;
 
+    let tunnel_cancel = CancellationToken::new();
+    let tunnel_handle = tunnel_agent.map(|tunnel_agent_options| {
+        ops::tunnel::supervise(
+            context.shell_handle(),
+            tunnel_agent_options,
+            tunnel_cancel.clone()
+        )
+    });
+
     let mut child = command.spawn()?;
 
     if let Some(ref notifier) = notifier {
         notifier
-            .notify_server(&manifest.name, &ServerEvent::Started)
+            .notify_server(&manifest.name, &ServerEvent::Started { tunnel_address })
             .await;
     }
 
@@ -494,6 +513,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             // without waiting on it.
             backup_cancel.cancel();
 
+            skip_echoed_signal();
+
             _ = context
                 .shell()
                 .status("Stopping", "asking the server to save and shut down");
@@ -532,6 +553,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
                     _ = context.shell().status("Stopped", "the server was forced down");
                 }
                 _ = shutdown.recv() => {
+                    skip_echoed_signal();
+
                     _ = context
                         .shell()
                         .warn("received a second signal, forcing the server down");
@@ -542,6 +565,14 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             }
         }
     };
+
+    tunnel_cancel.cancel();
+
+    if let Some(tunnel_handle) = tunnel_handle {
+        let _ = tunnel_handle.await;
+
+        _ = context.shell().status("Tunnel", "stopped the agent");
+    }
 
     if let Some(ref notifier) = notifier {
         let event = match exit_status {
