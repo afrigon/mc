@@ -5,12 +5,14 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::Context;
+use kdl::KdlDocument;
 
 use crate::context::McContext;
 use crate::crypto::checksum::ChecksumRef;
 use crate::crypto::checksum::LocalChecksum;
 use crate::manifest::Manifest;
 use crate::manifest::ManifestMod;
+use crate::manifest::document;
 use crate::manifest::lock::ModLockfile;
 use crate::manifest::lock::ModLockfileEntry;
 use crate::manifest::lock::ModLockfileSource;
@@ -32,9 +34,9 @@ pub struct AddModsOptions {
 pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<()> {
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
-        .context("could not find mc.toml file")?;
-    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<toml_edit::DocumentMut>()?;
+        .context("could not find mc.kdl file")?;
+    let manifest = Manifest::from_kdl_str(&manifest_string)?;
+    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -42,12 +44,6 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
     // TODO: add more options (ex: --url)
 
     if let Some(loader) = minecraft_loader {
-        // Pre-create `[mods]` as a standard table: writing through indexing
-        // alone would create the key as an inline `mods = { ... }` value.
-        manifest_document
-            .entry("mods")
-            .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
-
         for m in &options.mods {
             let version = services::modrinth_api::get_latest_version(
                 &context.http_client,
@@ -60,14 +56,14 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
                 format!("the mod `{}` could not be found on modrinth for the configured versions and loader", m)
             )?;
 
-            manifest_document["mods"][m] = toml_edit::value(&version.id);
+            document::set_mod_version(&mut manifest_document, m, &version.id)?;
 
             _ = context
                 .shell()
                 .status("Adding", format!("{} {} to mods", m, &version.id));
         }
     } else {
-        anyhow::bail!("a loader must be configured in mc.toml before adding to mods");
+        anyhow::bail!("a loader must be configured in mc.kdl before adding to mods");
     }
 
     tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
@@ -83,21 +79,15 @@ pub struct RemoveModsOptions {
 pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McResult<()> {
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
-        .context("could not find mc.toml file")?;
-    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<toml_edit::DocumentMut>()?;
-
-    let mods = manifest_document["mods"]
-        .as_table_mut()
-        .ok_or_else(|| anyhow::anyhow!("could not find a mods table in `mc.toml`"))?;
+        .context("could not find mc.kdl file")?;
+    let manifest = Manifest::from_kdl_str(&manifest_string)?;
+    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
 
     for m in &options.mods {
-        if manifest.mods.contains_key(m) {
+        if manifest.mods.contains_key(m) && document::remove_mod(&mut manifest_document, m) {
             _ = context
                 .shell()
                 .status("Removing", format!("{} from mods", m));
-
-            mods.remove(m);
         } else {
             _ = context
                 .shell()
@@ -118,9 +108,9 @@ pub struct UpdateModsOptions {
 pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McResult<()> {
     let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
         .await
-        .context("could not find mc.toml file")?;
-    let manifest = toml::from_str::<Manifest>(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<toml_edit::DocumentMut>()?;
+        .context("could not find mc.kdl file")?;
+    let manifest = Manifest::from_kdl_str(&manifest_string)?;
+    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -145,10 +135,10 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
         names.sort();
 
         for name in names {
-            let current = match &manifest.mods[name] {
-                ManifestMod::Version(version) => version.clone(),
-                ManifestMod::Detailed { version, .. } => version.clone(),
-                ManifestMod::Remote { .. } => {
+            let current = match manifest.mods.get(name) {
+                Some(ManifestMod::Version(version)) => version.clone(),
+                Some(ManifestMod::Detailed { version, .. }) => version.clone(),
+                Some(ManifestMod::Remote { .. }) | None => {
                     _ = context
                         .shell()
                         .status("Skipping", format!("{} (url mods are not versioned)", name));
@@ -177,14 +167,7 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
                 continue;
             }
 
-            match &manifest.mods[name] {
-                ManifestMod::Detailed { .. } => {
-                    manifest_document["mods"][name]["version"] = toml_edit::value(&latest.id);
-                }
-                _ => {
-                    manifest_document["mods"][name] = toml_edit::value(&latest.id);
-                }
-            }
+            document::set_mod_version(&mut manifest_document, name, &latest.id)?;
 
             _ = context
                 .shell()
@@ -193,7 +176,7 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
 
         tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
     } else {
-        anyhow::bail!("a loader must be configured in mc.toml before updating mods");
+        anyhow::bail!("a loader must be configured in mc.kdl before updating mods");
     }
 
     Ok(())
@@ -221,7 +204,7 @@ pub async fn sync(
         let old_lockfile = tokio::fs::read_to_string(&options.lockfile_path)
             .await
             .ok()
-            .and_then(|s| toml::from_str::<ModLockfile>(&s).ok())
+            .and_then(|s| ModLockfile::from_kdl_str(&s).ok())
             .map(|lockfile| lockfile.mods)
             .unwrap_or_default();
 
@@ -332,8 +315,11 @@ pub async fn sync(
         }
 
         let lockfile = ModLockfile { mods: new_lockfile };
-        let lockfile_string = toml::to_string_pretty(&lockfile)?;
-        tokio::fs::write(&options.lockfile_path, lockfile_string).await?;
+        tokio::fs::write(
+            &options.lockfile_path,
+            lockfile.to_kdl_document().to_string()
+        )
+        .await?;
     } else {
         if !mods.is_empty() {
             _ = context

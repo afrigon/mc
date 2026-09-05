@@ -8,7 +8,7 @@ const WORLD_LOCK: &str = "mc.world.lock";
 const BACKUP_LOCK: &str = "mc.backup.lock";
 
 /// Factory for an instance's advisory locks. The lock files live at the project
-/// root, next to `mc.toml`.
+/// root, next to `mc.kdl`.
 pub struct InstanceLocks {
     project_path: PathBuf
 }

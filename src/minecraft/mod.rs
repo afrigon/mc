@@ -1,4 +1,5 @@
-use serde::Deserialize;
+use std::str::FromStr;
+
 use serde::Serialize;
 use serde::Serializer;
 
@@ -7,7 +8,7 @@ pub mod log4j;
 pub mod seed;
 pub mod server_properties;
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum MinecraftDifficulty {
     Peaceful,
@@ -22,7 +23,21 @@ impl Default for MinecraftDifficulty {
     }
 }
 
-#[derive(Serialize, Deserialize, Copy, Clone)]
+impl FromStr for MinecraftDifficulty {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "peaceful" => Ok(MinecraftDifficulty::Peaceful),
+            "easy" => Ok(MinecraftDifficulty::Easy),
+            "normal" => Ok(MinecraftDifficulty::Normal),
+            "hard" => Ok(MinecraftDifficulty::Hard),
+            _ => anyhow::bail!("difficulty must be peaceful, easy, normal, or hard")
+        }
+    }
+}
+
+#[derive(Serialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum MinecraftGamemode {
     Survival,
@@ -34,6 +49,20 @@ pub enum MinecraftGamemode {
 impl Default for MinecraftGamemode {
     fn default() -> Self {
         MinecraftGamemode::Survival
+    }
+}
+
+impl FromStr for MinecraftGamemode {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "survival" => Ok(MinecraftGamemode::Survival),
+            "creative" => Ok(MinecraftGamemode::Creative),
+            "adventure" => Ok(MinecraftGamemode::Adventure),
+            "spectator" => Ok(MinecraftGamemode::Spectator),
+            _ => anyhow::bail!("gamemode must be survival, creative, adventure, or spectator")
+        }
     }
 }
 
@@ -79,7 +108,7 @@ impl Serialize for MinecraftPermission {
     }
 }
 
-#[derive(Deserialize, Serialize, Copy, Clone)]
+#[derive(Serialize, Copy, Clone)]
 pub enum MinecraftLevelKind {
     #[serde(rename = "minecraft:normal")]
     Normal,
@@ -95,4 +124,27 @@ pub enum MinecraftLevelKind {
 
     #[serde(rename = "minecraft:single_biome_surface")]
     SingleBiomeSurface
+}
+
+impl Default for MinecraftLevelKind {
+    fn default() -> Self {
+        MinecraftLevelKind::Normal
+    }
+}
+
+impl FromStr for MinecraftLevelKind {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "minecraft:normal" => Ok(MinecraftLevelKind::Normal),
+            "minecraft:flat" => Ok(MinecraftLevelKind::Flat),
+            "minecraft:large_biomes" => Ok(MinecraftLevelKind::LargeBiomes),
+            "minecraft:amplified" => Ok(MinecraftLevelKind::Amplified),
+            "minecraft:single_biome_surface" => Ok(MinecraftLevelKind::SingleBiomeSurface),
+            _ => anyhow::bail!(
+                "level type must be minecraft:normal, minecraft:flat, minecraft:large_biomes, minecraft:amplified, or minecraft:single_biome_surface"
+            )
+        }
+    }
 }

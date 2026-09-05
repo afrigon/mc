@@ -179,7 +179,7 @@ impl Default for ServerProperties {
     }
 }
 
-// The subset of server.properties driven by `mc.toml` and the environment.
+// The subset of server.properties driven by `mc.kdl` and the environment.
 // Serializing it yields the managed keys.
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -289,7 +289,7 @@ impl ServerProperties {
             env!("CARGO_PKG_VERSION")
         );
 
-        let notice = "This file is generated from mc.toml on every start; manual edits will be lost. Use the [server.properties] section of mc.toml instead.";
+        let notice = "This file is generated from mc.kdl on every start; manual edits will be lost. Use the properties block of the server section in mc.kdl instead.";
 
         let date_string = utils::date::minecraft_date_string()?;
 

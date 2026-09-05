@@ -15,10 +15,10 @@ use crate::utils::process::ShutdownSignals;
 
 #[derive(Args)]
 pub struct BackupCommand {
-    /// Path to mc.toml
+    /// Path to mc.kdl
     #[arg(
         long,
-        default_value = "./mc.toml",
+        default_value = "./mc.kdl",
         hide_default_value = true,
         value_name = "PATH"
     )]
@@ -34,8 +34,8 @@ impl CommandHandler for BackupCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let manifest_string = tokio::fs::read_to_string(&self.manifest_path)
             .await
-            .context("could not find mc.toml file")?;
-        let manifest = toml::from_str::<Manifest>(&manifest_string)
+            .context("could not find mc.kdl file")?;
+        let manifest = Manifest::from_kdl_str(&manifest_string)
             .map_err(|_| anyhow::anyhow!("could not parse manifest file"))?;
 
         let instance_path = context.cwd.join("instance");

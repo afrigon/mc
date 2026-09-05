@@ -1,9 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 
-use anyhow::Context;
-use serde::Deserialize;
-use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
@@ -24,19 +21,6 @@ impl Serialize for LoaderKind {
         S: Serializer
     {
         serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl<'de> Deserialize<'de> for LoaderKind {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>
-    {
-        let s = String::deserialize(deserializer)?;
-
-        LoaderKind::from_str(&s)
-            .with_context(|| format!("could not parse loader kind: {s}"))
-            .map_err(serde::de::Error::custom)
     }
 }
 

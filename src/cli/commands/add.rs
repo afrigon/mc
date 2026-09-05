@@ -10,10 +10,10 @@ use crate::utils::errors::CliResult;
 
 #[derive(Args)]
 pub struct AddCommand {
-    /// Path to mc.toml
+    /// Path to mc.kdl
     #[arg(
         long,
-        default_value = "./mc.toml",
+        default_value = "./mc.kdl",
         hide_default_value = true,
         value_name = "PATH"
     )]
