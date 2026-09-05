@@ -10,6 +10,7 @@
     - [Managing Mods](./guides/mods.md)
     - [Backups](./guides/backups.md)
     - [Running under systemd](./guides/systemd.md)
+    - [Tunnels](./guides/tunnel.md)
 
 - [Reference](./reference.md)
     - [The Manifest Format](./reference/manifest.md)
@@ -33,3 +34,4 @@
     - [Installation Commands](./commands/installation.md)
         - [mc java](./commands/java.md)
         - [mc minecraft](./commands/minecraft.md)
+        - [mc tunnel](./commands/tunnel.md)

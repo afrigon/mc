@@ -7,3 +7,4 @@ ahead of time:
 
 - [mc java](./java.md) — Java runtimes.
 - [mc minecraft](./minecraft.md) — Minecraft versions and mod loaders.
+- [mc tunnel](./tunnel.md) — tunnel agents.
