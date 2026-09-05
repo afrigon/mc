@@ -2,7 +2,7 @@
 
 **mc** is a command line tool to manage and run Minecraft instances.
 
-An instance is described by a single manifest file, `mc.toml`. From that one
+An instance is described by a single manifest file, `mc.kdl`. From that one
 file, `mc run` takes care of everything needed to bring the instance up:
 
 - installs a Java runtime
@@ -36,7 +36,7 @@ instance as a systemd service.
 
 **[Reference](./reference.md)**
 
-The `mc.toml` manifest format, the environment variables mc reads, and the
+The `mc.kdl` manifest format, the environment variables mc reads, and the
 on-disk layout of an instance.
 
 **[Commands](./commands.md)**

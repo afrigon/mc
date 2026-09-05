@@ -1,6 +1,6 @@
 # Environment Variables
 
-The environment acts as an override layer on top of `mc.toml`, and is the
+The environment acts as an override layer on top of `mc.kdl`, and is the
 only place mc reads secrets from — secrets are deliberately kept out of the
 manifest so it can be committed and shared safely.
 
@@ -8,7 +8,7 @@ manifest so it can be committed and shared safely.
 
 The password for RCON, the remote console protocol used to coordinate
 backups with a running instance. It takes precedence over a
-`"rcon.password"` entry under `[server.properties]`.
+`"rcon.password"` entry in the `properties` block of the `server` section.
 
 RCON is enabled exactly when a password is configured. When backups are
 enabled and no password is set anywhere, mc generates one at each start so
@@ -17,7 +17,7 @@ reach the remote console with a known password.
 
 ## `MC_BACKUPS_S3_BUCKET`
 
-The S3 bucket that receives backup archives when `[backups.storage]` has
+The S3 bucket that receives backup archives when the `storage` node of `backups` has
 `type = "s3"`. It takes precedence over the `bucket` key in the manifest and
 can replace it entirely.
 
@@ -29,7 +29,7 @@ IAM role.
 ## `MC_DISCORD_WEBHOOK`
 
 The Discord webhook URL that notifications are posted to. Setting it is
-what turns notifications on; without it none are sent. The `[notifications]`
+what turns notifications on; without it none are sent. The `notifications`
 section of the manifest selects which events are reported — instance
 lifecycle, crashes, forced shutdowns, and backup results are all on by
 default.

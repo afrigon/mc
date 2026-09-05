@@ -7,13 +7,14 @@ consistent, even under load.
 
 ## Scheduled backups
 
-```toml
-[backups]
-enabled = true
-frequency = "0 0 * * * *"
+```kdl
+backups {
+    enabled #true
+    frequency "0 0 * * * *"
+}
 ```
 
-With `enabled = true`, backups fire on the `frequency` schedule while the
+With `enabled #true`, backups fire on the `frequency` schedule while the
 instance runs. `frequency` is a cron expression with six fields — seconds,
 minutes, hours, day of month, month, day of week. The example above backs up
 at the start of every hour.
@@ -50,17 +51,17 @@ connections.
 
 ## Storage
 
-Archives go to a storage target configured under `[backups.storage]`. Two
-types are supported.
+Archives go to the storage target named by the `storage` node of `backups`.
+Its first value selects the backend; the backend's settings follow as
+properties on the same node. Two backends are supported.
 
 **Local** (the default) stores archives in a directory and keeps only the
 `keep` most recent automatic ones:
 
-```toml
-[backups.storage]
-type = "local"
-path = "backups"
-keep = 20
+```kdl
+backups {
+    storage "local" path="backups" keep=20
+}
 ```
 
 Archives appear in the directory atomically: an interrupted backup never
@@ -69,10 +70,10 @@ about to replace.
 
 **S3** uploads archives to a bucket:
 
-```toml
-[backups.storage]
-type = "s3"
-bucket = "my-minecraft-backups"
+```kdl
+backups {
+    storage "s3" bucket="my-minecraft-backups"
+}
 ```
 
 Credentials come from the standard AWS credential chain (environment,
@@ -106,7 +107,7 @@ prefix) if named backups must outlive it.
 
 mc reports backup results — along with other instance events — to a webhook
 when one is configured through the environment (`MC_DISCORD_WEBHOOK` for
-Discord). The `[notifications]` section of the manifest selects which
+Discord). The `notifications` section of the manifest selects which
 events are sent; see
 [The Manifest Format](../reference/manifest.md#notifications). A failed
 notification never fails the backup itself.

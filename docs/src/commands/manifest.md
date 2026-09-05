@@ -1,6 +1,6 @@
 # Manifest Commands
 
-Commands that create or edit `mc.toml`:
+Commands that create or edit `mc.kdl`:
 
 - [mc init](./init.md) — create a new instance.
 - [mc add](./add.md) — add mods to the manifest.

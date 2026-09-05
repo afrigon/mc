@@ -6,7 +6,7 @@ mc [OPTIONS] <COMMAND>
 
 The `mc` binary is a collection of subcommands; run one of the commands
 documented in this chapter. Every command operates on the instance in the
-current working directory — the directory containing `mc.toml`.
+current working directory — the directory containing `mc.kdl`.
 
 ## Global options
 

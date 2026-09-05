@@ -10,7 +10,7 @@ mc java list
 
 Lists the runtimes mc can install, as `vendor@version` descriptors. The one
 marked `(recommended)` is the default used when the manifest does not
-configure `[java] version`.
+configure `version` under `java`.
 
 ```console
 $ mc java list

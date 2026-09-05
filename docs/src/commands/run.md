@@ -40,5 +40,5 @@ instance's exit code.
 
 ## Options
 
-- `--manifest-path <PATH>` — path to `mc.toml`. Defaults to `./mc.toml`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.

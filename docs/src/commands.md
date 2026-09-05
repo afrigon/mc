@@ -2,7 +2,7 @@
 
 - [General Commands](./commands/general.md) — the `mc` binary itself and its
   global options.
-- [Manifest Commands](./commands/manifest.md) — create and edit `mc.toml`:
+- [Manifest Commands](./commands/manifest.md) — create and edit `mc.kdl`:
   [`mc init`](./commands/init.md), [`mc add`](./commands/add.md),
   [`mc remove`](./commands/remove.md), [`mc update`](./commands/update.md).
 - [Instance Commands](./commands/instance.md) — operate the instance:

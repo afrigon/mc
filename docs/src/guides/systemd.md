@@ -33,7 +33,7 @@ $ systemctl enable --now myserver
 ```
 
 `WorkingDirectory` must be the instance root — the directory containing
-`mc.toml` — since mc operates relative to it.
+`mc.kdl` — since mc operates relative to it.
 
 ## Secrets
 
