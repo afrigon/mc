@@ -324,12 +324,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         };
 
         match ops::tunnel::ensure(context, &tunnel_ensure_options).await {
-            Ok(Some(address)) => {
-                _ = context
-                    .shell()
-                    .status("Tunnel", format!("players can join at {}", address));
-                tunnel_address = Some(address);
-            }
+            Ok(Some(address)) => tunnel_address = Some(address),
             Ok(None) => {
                 _ = context.shell().warn(format!(
                     "the tunnel is still being set up by playit.gg; check {}",
@@ -349,7 +344,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             work_directory: tunnel_directory,
             socket_path: ops::tunnel::socket_path(&manifest.name),
             log_level: server_log_level,
-            logs: options.tunnel_logs
+            logs: options.tunnel_logs,
+            address: tunnel_address.clone()
         });
     }
 

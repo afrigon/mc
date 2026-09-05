@@ -310,7 +310,8 @@ pub struct TunnelAgentOptions {
     pub work_directory: PathBuf,
     pub socket_path: String,
     pub log_level: &'static str,
-    pub logs: bool
+    pub logs: bool,
+    pub address: Option<String>
 }
 
 fn agent_command(options: &TunnelAgentOptions) -> Command {
@@ -397,6 +398,8 @@ pub fn supervise(
             .unwrap_or_else(PoisonError::into_inner)
             .status("Tunnel", "starting the agent");
 
+        let mut announced = false;
+
         loop {
             let mut child = match command.spawn() {
                 Ok(child) => child,
@@ -408,6 +411,15 @@ pub fn supervise(
                     return;
                 }
             };
+
+            if let Some(address) = options.address.as_ref().filter(|_| !announced) {
+                announced = true;
+
+                _ = shell
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .status("Tunnel", format!("players can join at {}", address));
+            }
 
             tokio::select! {
                 _ = cancel.cancelled() => {
