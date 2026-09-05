@@ -7,6 +7,7 @@ pub mod minecraft;
 pub mod remove;
 pub mod restore;
 pub mod run;
+pub mod tunnel;
 pub mod update;
 
 use clap::Subcommand;
@@ -20,6 +21,7 @@ use crate::cli::commands::minecraft::MinecraftCommand;
 use crate::cli::commands::remove::RemoveCommand;
 use crate::cli::commands::restore::RestoreCommand;
 use crate::cli::commands::run::RunCommand;
+use crate::cli::commands::tunnel::TunnelCommand;
 use crate::cli::commands::update::UpdateCommand;
 
 #[derive(Subcommand)]
@@ -27,6 +29,8 @@ pub enum CliCommand {
     Java(JavaCommand),
 
     Minecraft(MinecraftCommand),
+
+    Tunnel(TunnelCommand),
 
     /// Create a new mc package in an existing directory
     Init(InitCommand),

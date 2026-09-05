@@ -53,7 +53,8 @@ pub async fn stream_artifact(
     let result = match source.kind {
         ArtifactKind::Zip => deflate_zip(hasher, checksum, output, staging).await,
         ArtifactKind::TarGz => deflate_tar_gz(hasher, checksum, output, staging).await,
-        _ => save_file(hasher, checksum, output, staging).await
+        ArtifactKind::Jar => save_file(hasher, checksum, output, staging, false).await,
+        ArtifactKind::Binary => save_file(hasher, checksum, output, staging, true).await
     };
 
     // Empty-only removal: never deletes anything another operation is staging.
@@ -62,11 +63,13 @@ pub async fn stream_artifact(
     result
 }
 
+#[cfg_attr(not(unix), allow(unused_variables))]
 async fn save_file<R: AsyncRead + Unpin>(
     mut reader: Hasher<R>,
     checksum: Option<LocalChecksum>,
     output: &Path,
-    staging: &Path
+    staging: &Path,
+    executable: bool
 ) -> McResult<()> {
     let dir = tempfile::tempdir_in(staging)?;
     let file_path = dir.path().join("file.partial");
@@ -81,6 +84,13 @@ async fn save_file<R: AsyncRead + Unpin>(
         if reader.hash().as_ref() != checksum.hash() {
             anyhow::bail!("checksum does not match")
         }
+    }
+
+    #[cfg(unix)]
+    if executable {
+        use std::os::unix::fs::PermissionsExt;
+
+        tokio::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o755)).await?;
     }
 
     tokio::fs::rename(file_path, output).await?;

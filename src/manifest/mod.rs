@@ -26,6 +26,8 @@ use crate::ops::notifications::NotifierConfiguration;
 use crate::resolvers::java::JavaVersionResolver;
 use crate::resolvers::loader::LoaderVersionResolver;
 use crate::resolvers::minecraft::MinecraftVersionResolver;
+use crate::resolvers::tunnel::TunnelVersionResolver;
+use crate::tunnel::TunnelDescriptor;
 use crate::utils::errors::McResult;
 use crate::utils::product_descriptor::ProductDescriptor;
 use crate::utils::product_descriptor::RawProductDescriptor;
@@ -52,7 +54,10 @@ pub struct Manifest {
     pub backups: ManifestBackups,
 
     #[serde(default)]
-    pub notifications: ManifestNotifications
+    pub notifications: ManifestNotifications,
+
+    #[serde(default)]
+    pub tunnel: Option<ManifestTunnel>
 }
 
 #[derive(Deserialize)]
@@ -110,6 +115,29 @@ impl Default for ManifestJava {
                 String::from("-XX:+AlwaysPreTouch"),
                 String::from("-Djdk.graal.TuneInlinerExploration=1"),
             ]
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct ManifestTunnel {
+    pub provider: RawProductDescriptor
+}
+
+impl ManifestTunnel {
+    pub async fn provider_descriptor(&self, context: &McContext) -> McResult<TunnelDescriptor> {
+        TunnelVersionResolver::resolve_descriptor(context, &self.provider).await
+    }
+}
+
+impl Default for ManifestTunnel {
+    fn default() -> Self {
+        ManifestTunnel {
+            provider: RawProductDescriptor {
+                product: String::from("playit"),
+                version: None
+            }
         }
     }
 }

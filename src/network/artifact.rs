@@ -7,6 +7,7 @@ use crate::utils::errors::McResult;
 
 pub enum ArtifactKind {
     Jar,
+    Binary,
     Zip,
     TarGz
 }
