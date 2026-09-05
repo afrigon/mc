@@ -1,8 +1,8 @@
 # Managing Mods
 
-Mods are declared in the `mods` block of `mc.kdl` and installed when the
-instance starts. Each node names a mod by its identifier on the mod registry
-and pins the version to install:
+Mods are declared in the `mods` block of `mc.kdl`, grouped by source, and
+installed when the instance starts. Under `modrinth`, each node names a mod
+by its identifier on the mod registry and pins the version to install:
 
 ```kdl
 minecraft {
@@ -11,19 +11,21 @@ minecraft {
 }
 
 mods {
-    lithium "..."
+    modrinth {
+        lithium "..."
+    }
 }
 ```
 
 A mod loader must be configured under `minecraft` for mods to be installed;
 without one, the `mods` block is ignored. See
-[The Manifest Format](../reference/manifest.md) for every supported form of a
-mod entry, including mods fetched from a direct URL.
+[The Manifest Format](../reference/manifest.md) for the other groups,
+including mods fetched from a direct URL.
 
 ## Adding and removing mods
 
 [`mc add`](../commands/add.md) and [`mc remove`](../commands/remove.md) edit
-the `mods` block for you. `mc add` looks the mod up on the registry and pins
+the `modrinth` group for you. `mc add` looks the mod up on the registry and pins
 the latest version compatible with the configured Minecraft version and
 loader:
 
@@ -57,4 +59,4 @@ Two consequences of this are worth knowing:
   installed automatically.
 - The instance's `mods` directory is fully managed by mc. A jar placed there
   by hand is removed on the next start. To install a mod that is not on the
-  registry, declare it in the manifest with a `url` property instead.
+  registry, declare it in the manifest under the `http` group instead.

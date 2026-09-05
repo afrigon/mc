@@ -4,7 +4,7 @@
 mc add [OPTIONS] <MOD_SLUG>...
 ```
 
-Adds mods to the `mods` block of the manifest. Each `MOD_SLUG` is the
+Adds mods to the `modrinth` group of the manifest's `mods` block. Each `MOD_SLUG` is the
 mod's identifier on the mod registry. The latest version compatible with the
 configured Minecraft version and loader is looked up and pinned; the command
 fails if a mod cannot be found for that combination.

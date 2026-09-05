@@ -4,7 +4,7 @@
 mc remove [OPTIONS] <MOD_SLUG>...
 ```
 
-Removes mods from the `mods` block of the manifest. A slug that is not in
+Removes mods from the manifest's `mods` block, whichever group lists them. A slug that is not in
 the manifest is reported and skipped.
 
 The jars are uninstalled the next time the instance starts. A removed mod's

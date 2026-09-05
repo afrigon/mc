@@ -19,9 +19,9 @@ reach the remote console with a known password.
 
 ## `MC_BACKUPS_S3_BUCKET`
 
-The S3 bucket that receives backup archives when the `storage` node of `backups` has
-`type = "s3"`. It takes precedence over the `bucket` key in the manifest and
-can replace it entirely.
+The S3 bucket that receives backup archives when the `backups` section
+names an `s3` target. It takes precedence over the bucket written in the
+manifest.
 
 S3 credentials are not read through mc-specific variables; they come from
 the standard AWS credential chain — `AWS_ACCESS_KEY_ID` /

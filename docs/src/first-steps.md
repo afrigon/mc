@@ -34,12 +34,14 @@ server {
 }
 
 backups {
-    enabled #true
+    on
     frequency "0 0 * * * *"
 }
 
 mods {
-    lithium "..."
+    modrinth {
+        lithium "..."
+    }
 }
 ```
 

@@ -9,12 +9,12 @@ consistent, even under load.
 
 ```kdl
 backups {
-    enabled #true
+    on
     frequency "0 0 * * * *"
 }
 ```
 
-With `enabled #true`, backups fire on the `frequency` schedule while the
+With `on` present, backups fire on the `frequency` schedule while the
 instance runs. `frequency` is a cron expression with six fields — seconds,
 minutes, hours, day of month, month, day of week. The example above backs up
 at the start of every hour.
@@ -30,7 +30,7 @@ password yourself.
 
 A backup can be taken at any time with
 [`mc backup`](../commands/backup.md), even when scheduled backups are
-disabled — `enabled` only controls the schedule. It works against a stopped
+disabled — `on` only controls the schedule. It works against a stopped
 instance, and against a running one as long as the instance was started with
 an RCON password configured (always the case when backups are enabled). When
 the instance is running but cannot be reached, mc refuses to back up rather
@@ -51,15 +51,17 @@ connections.
 
 ## Storage
 
-Archives go to the storage target named by the `storage` node of `backups`.
-Its first value selects the backend. Two backends are supported.
+Archives go to the storage target named in the `backups` section: `local`
+or `s3`, never both. When neither is written, archives go to the `backups`
+directory of the instance.
 
-**Local** (the default) stores archives in a directory and keeps only the
-`keep` most recent automatic ones:
+**Local** stores archives in a directory and keeps only the `keep` most
+recent automatic ones:
 
 ```kdl
 backups {
-    storage "local" path="backups" keep=20
+    keep 20
+    local "/mnt/data/mc"
 }
 ```
 
@@ -71,13 +73,13 @@ about to replace.
 
 ```kdl
 backups {
-    storage "s3" bucket="my-minecraft-backups"
+    s3 "my-minecraft-backups" region="us-east-1"
 }
 ```
 
 Credentials come from the standard AWS credential chain (environment,
-`~/.aws`, or an IAM role). The bucket can also be supplied with the
-`MC_BACKUPS_S3_BUCKET` environment variable instead of the manifest. mc does
+`~/.aws`, or an IAM role), and so does the region when `region` is omitted.
+The `MC_BACKUPS_S3_BUCKET` environment variable overrides the bucket. mc does
 not prune S3 backups; use a bucket lifecycle rule to expire old archives.
 
 Give each instance its own bucket or directory. mc treats a file in the

@@ -19,7 +19,7 @@ tunnel {
 }
 ```
 
-Adding the section is enough; see
+Adding the section is enough — a bare `tunnel` node also works; see
 [`tunnel`](../reference/manifest.md#tunnel) for its keys.
 
 ## First start

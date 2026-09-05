@@ -3,7 +3,7 @@
 The `mc.kdl` manifest at the root of an instance describes everything about
 it. It is written in [KDL](https://kdl.dev). Every section except the two
 top-level keys is optional; omitted keys take the defaults listed below.
-Unknown or repeated keys are an error.
+Unknown keys, repeated keys, and stray values are errors.
 
 ```kdl
 name "myserver"
@@ -31,13 +31,16 @@ server {
 }
 
 mods {
-    lithium "..."
+    modrinth {
+        lithium "..."
+    }
 }
 
 backups {
-    enabled #true
+    on
     frequency "0 0 * * * *"
-    storage "local" path="backups" keep=20
+    keep 20
+    local "backups"
 }
 ```
 
@@ -94,7 +97,8 @@ The Minecraft version and mod loader.
 
 Exposes the instance to players outside the local network through a tunnel
 provider; see the [Tunnels](../guides/tunnel.md) guide. The section is
-opt-in: when it is absent, no tunnel agent is installed or started.
+opt-in: when it is absent, no tunnel agent is installed or started. A bare
+`tunnel` node enables it with the defaults.
 
 - `provider` — the tunnel provider, as a `name` or `name@version`
   descriptor. `playit` is the accepted provider. Defaults to `"playit"`,
@@ -171,63 +175,70 @@ enabled (`white-list`), and the server binds all addresses, IPv6 included
 
 ## `mods`
 
-The mods to install, one node per mod, named by the mod's identifier (slug)
-on the mod registry. Three forms are supported:
+The mods to install, grouped by where they come from. Inside a group, each
+node is named after the mod and carries where to fetch it:
 
 ```kdl
 mods {
-    // a version identifier on the registry
-    lithium "..."
+    // mods from the registry, pinned to a version identifier
+    modrinth {
+        lithium "..."
+        carpet "..."
+    }
 
-    // the same, naming the registry
-    carpet "..." service="modrinth"
-
-    // a jar fetched from a URL, for mods not on the registry
-    my-mod url="https://example.com/my-mod.jar"
+    // jars fetched from a URL, for mods not on the registry
+    http {
+        my-mod "https://example.com/my-mod.jar"
+    }
 }
 ```
 
-`service` names the registry hosting the mod and defaults to `"modrinth"`.
+`modrinth` maps a mod's identifier (slug) on the registry to the version
+identifier to install. `http` maps a name of your choosing to the URL of a
+jar. A name may appear in only one group; it becomes the jar's filename.
 
 [`mc add`](../commands/add.md), [`mc remove`](../commands/remove.md), and
-[`mc update`](../commands/update.md) edit this block for you and pin
-compatible versions. Required dependencies are resolved automatically when
-the instance starts and recorded in the `mc.lock` lockfile — see
+[`mc update`](../commands/update.md) edit the `modrinth` group for you and
+pin compatible versions. Required dependencies are resolved automatically
+when the instance starts and recorded in the `mc.lock` lockfile — see
 [Managing Mods](../guides/mods.md).
 
 ## `backups`
 
 Scheduled world backups, taken while the instance runs.
 
-- `enabled` — schedule backups while the instance runs. Defaults to
-  `#false`. Manual [`mc backup`](../commands/backup.md) works regardless.
+- `on` — a bare flag: when present, backups run on the `frequency` schedule
+  while the instance runs. Comment it out or remove it to disable the
+  schedule. Manual [`mc backup`](../commands/backup.md) works regardless.
 - `frequency` — a cron expression with six fields: seconds, minutes, hours,
   day of month, month, day of week. Defaults to `"0 0 * * * *"` (hourly).
-- `storage` — where archives are stored; see below. When the node is
-  omitted, archives go to local storage under `backups`, keeping the 20 most
-  recent.
+- `keep` — the number of most-recent automatic archives to keep in local
+  storage; older ones are pruned. Defaults to `20`. S3 storage is never
+  pruned.
+- `local` — the directory archives are stored in. This is the default
+  storage, under `backups`, when neither `local` nor `s3` is written.
+- `s3` — the bucket archives are uploaded to, with an optional `region`
+  property. Credentials come from the standard AWS credential chain, and
+  `MC_BACKUPS_S3_BUCKET` overrides the bucket. Without `region`, the region
+  also comes from the credential chain.
 
-### `storage`
-
-Where archives are stored. The first value selects the backend:
+Write at most one of `local` and `s3`.
 
 ```kdl
 backups {
-    // path is required once the node is written; keep shown at its default
-    storage "local" path="backups" keep=20
+    on
+    frequency "0 0 * * * *"
+    keep 20
+    local "/mnt/data/mc"
 }
 ```
 
 ```kdl
 backups {
-    storage "s3" bucket="my-minecraft-backups"
+    on
+    s3 "my-minecraft-backups" region="us-east-1"
 }
 ```
-
-For `local`, `path` is required and `keep` is the number of most-recent
-automatic archives to keep. For `s3`, the bucket may also come from the
-`MC_BACKUPS_S3_BUCKET` environment variable, and credentials come from the
-standard AWS credential chain. The default is local storage.
 
 See the [Backups](../guides/backups.md) guide for the full picture.
 
