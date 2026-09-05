@@ -46,7 +46,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -82,7 +82,7 @@ jobs:
           Copy-Item target\${{ matrix.target }}\release\mc.exe dist\mc.exe
           Compress-Archive -Path dist\mc.exe -DestinationPath dist\${{ matrix.filename }} -Force
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.filename }}
           path: |
@@ -92,10 +92,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/**/*
