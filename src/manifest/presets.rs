@@ -130,6 +130,7 @@ pub(super) fn create_document_base(
         utils::kdl::leaf("gamemode", utils::kdl::quoted("survival"), 1),
         utils::kdl::leaf("difficulty", utils::kdl::quoted("normal"), 1),
         utils::kdl::leaf("hardcore", false, 1),
+        utils::kdl::leaf("allow-list", true, 1),
         eula_node
     ]);
     nodes.push(server);

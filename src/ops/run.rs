@@ -200,9 +200,9 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let mut properties = ServerProperties::default();
 
+    properties.enforce_whitelist = manifest.server.allow_list;
+
     // Backups flush the world over rcon, so an enabled instance needs a password.
-    // The environment password rides the managed layer; the generated fallback
-    // sits in the base layer so a `rcon.password` override can replace it.
     let environment_rcon_password = env::var("MC_RCON_PASSWORD").ok();
 
     properties.rcon_password = match &environment_rcon_password {
@@ -214,21 +214,6 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     let managed_entries = managed.to_map()?;
 
     let property_overrides = manifest.server.property_overrides()?;
-
-    for key in property_overrides.keys() {
-        if managed_entries.contains_key(key) {
-            _ = context.shell().warn(format!(
-                "the `{}` entry in the `properties` block of `server` conflicts with a value managed through the manifest and was ignored",
-                key
-            ));
-        }
-    }
-
-    if property_overrides.contains_key("enable-rcon") {
-        _ = context.shell().warn(
-            "the `enable-rcon` entry in the `properties` block of `server` was ignored; rcon is enabled when a rcon password is configured"
-        );
-    }
 
     let mut property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
 

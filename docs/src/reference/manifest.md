@@ -13,20 +13,29 @@ java {
     version "graal@25"
     min-memory 4096
     max-memory 4096
+    jvm-arguments "-Djava.net.preferIPv6Addresses=true" "-XX:+AlwaysPreTouch" "-Djdk.graal.TuneInlinerExploration=1"
 }
 
 minecraft {
-    version "..."
+    version "latest"
     loader "fabric"
 }
 
 server {
     gamemode "survival"
     difficulty "normal"
+    level-type "minecraft:normal"
+    hardcore #false
+    allow-list #true
+    port 25565
+    rcon-port 25575
+    capacity 20
+    view-distance 16
+    simulation-distance 16
     eula #true
 
     properties {
-        white-list #false
+        spawn-protection 0
     }
 }
 
@@ -41,6 +50,14 @@ backups {
     frequency "0 0 * * * *"
     keep 20
     local "backups"
+}
+
+notifications {
+    on-lifecycle-event #true
+    on-panic #true
+    on-sigkill #true
+    on-backup #true
+    on-backup-failure #true
 }
 ```
 
@@ -127,6 +144,11 @@ through `properties`.
   `"minecraft:single_biome_surface"`. Defaults to `"minecraft:normal"`.
   (`level-type`)
 - `hardcore` — defaults to `#false`. (`hardcore`)
+- `allow-list` — whether players must be on the allow list before they can
+  join. Defaults to `#true`. (`white-list`) Enabling it also sets
+  `enforce-whitelist`, so a player removed from the list is kicked at once;
+  disabling it clears both. `enforce-whitelist` is not managed, so an entry
+  for it in `properties` overrides that half on its own.
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the
@@ -152,8 +174,8 @@ block is the way to reach settings that have no `server` field:
 ```kdl
 server {
     properties {
-        white-list #false
         spawn-protection 16
+        enforce-whitelist #false
         "query.port" 25565
     }
 }
@@ -163,15 +185,19 @@ Values may be strings, integers, floats, or booleans. Keys containing a dot
 must be quoted, as above; a nested block spells the same key, so
 `rcon { broadcast "yes" }` sets `rcon.broadcast`.
 
-Keys managed by mc take precedence: an entry that conflicts with a value
-derived from the manifest or the environment is ignored with a warning.
-`enable-rcon` is always ignored — RCON is enabled exactly when an RCON
-password is configured (see
+Keys managed by mc are rejected: an entry for a key that a `server` field
+or the top-level `name` and `description` already drive is an error naming
+the field to use instead. `enable-rcon` is rejected too — RCON is enabled
+exactly when an RCON password is configured (see
 [Environment Variables](./environment-variables.md)).
 
-Note two defaults that differ from a vanilla server: the allow list is
-enabled (`white-list`), and the server binds all addresses, IPv6 included
-(`server-ip`).
+Every key not written here takes the vanilla default as of Minecraft 26.3,
+listed on the [`server.properties`](https://minecraft.wiki/w/Server.properties)
+wiki page, with three exceptions:
+
+- `enforce-whitelist` — follows `allow-list`, so `#true` by default.
+- `server-ip` — `"::"`, all addresses, IPv6 included; driven by `ip`.
+- `spawn-protection` — `0`.
 
 ## `mods`
 
