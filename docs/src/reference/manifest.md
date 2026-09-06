@@ -35,7 +35,7 @@ server {
     eula #true
 
     properties {
-        spawn-protection 16
+        spawn-protection 0
     }
 }
 
@@ -191,8 +191,12 @@ the field to use instead. `enable-rcon` is rejected too — RCON is enabled
 exactly when an RCON password is configured (see
 [Environment Variables](./environment-variables.md)).
 
-Note one default that differs from a vanilla server: mc binds all
-addresses, IPv6 included (`server-ip`).
+Every key not written here takes the vanilla default as of Minecraft 26.3,
+with three exceptions:
+
+- `enforce-whitelist` — follows `allow-list`, so `#true` by default.
+- `server-ip` — `"::"`, all addresses, IPv6 included; driven by `ip`.
+- `spawn-protection` — `0`.
 
 ## `mods`
 
