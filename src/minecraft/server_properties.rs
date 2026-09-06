@@ -179,7 +179,7 @@ impl Default for ServerProperties {
     }
 }
 
-pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 16] = [
+pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 18] = [
     ("difficulty", "set `difficulty` in `server` instead"),
     (
         "enable-rcon",
@@ -187,11 +187,16 @@ pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 16] = [
     ),
     ("gamemode", "set `gamemode` in `server` instead"),
     ("hardcore", "set `hardcore` in `server` instead"),
+    (
+        "hide-online-players",
+        "set `hide-online-players` in `server` instead"
+    ),
     ("level-name", "set `name` at the top level instead"),
     ("level-seed", "set `seed` in `server` instead"),
     ("level-type", "set `level-type` in `server` instead"),
     ("max-players", "set `capacity` in `server` instead"),
     ("motd", "set `description` at the top level instead"),
+    ("online-mode", "set `online-mode` in `server` instead"),
     (
         "rcon.password",
         "set `MC_RCON_PASSWORD` in the environment instead"
@@ -215,6 +220,7 @@ pub struct ManagedServerProperties {
     pub difficulty: MinecraftDifficulty,
     pub gamemode: MinecraftGamemode,
     pub hardcore: bool,
+    pub hide_online_players: bool,
     pub level_name: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,6 +229,7 @@ pub struct ManagedServerProperties {
     pub level_type: MinecraftLevelKind,
     pub max_players: i32,
     pub motd: String,
+    pub online_mode: bool,
 
     #[serde(rename = "rcon.password", skip_serializing_if = "Option::is_none")]
     pub rcon_password: Option<String>,
@@ -248,11 +255,13 @@ impl ManagedServerProperties {
             difficulty: manifest.server.difficulty,
             gamemode: manifest.server.gamemode,
             hardcore: manifest.server.hardcore,
+            hide_online_players: manifest.server.hide_online_players,
             level_name: manifest.name.clone(),
             level_seed: manifest.server.seed.clone(),
             level_type: manifest.server.level_type,
             max_players: manifest.server.capacity.max(0),
             motd: manifest.description.clone(),
+            online_mode: manifest.server.online_mode,
             rcon_password,
             rcon_port: manifest.server.rcon_port,
             server_ip: manifest.server.ip.clone(),

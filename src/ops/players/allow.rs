@@ -25,7 +25,7 @@ pub struct AllowAddOptions {
 
 pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult<()> {
     let mut files = ManifestFiles::load(&options.paths).await?;
-    let online_mode = files.manifest.server.online_mode();
+    let online_mode = files.manifest.server.online_mode;
     let mut added = Vec::new();
 
     warn_when_allow_list_is_off(context, &files.manifest);

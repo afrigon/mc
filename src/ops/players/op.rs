@@ -20,7 +20,7 @@ pub struct OpAddOptions {
 
 pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()> {
     let mut files = ManifestFiles::load(&options.paths).await?;
-    let online_mode = files.manifest.server.online_mode();
+    let online_mode = files.manifest.server.online_mode;
     let server_level = files.manifest.server.op_permission_level();
     let live_applicable =
         options.level.is_none_or(|level| level == server_level) && !options.bypasses_player_limit;

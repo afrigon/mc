@@ -365,6 +365,8 @@ pub struct ManifestServer {
     pub level_type: MinecraftLevelKind,
     pub hardcore: bool,
     pub allow_list: bool,
+    pub online_mode: bool,
+    pub hide_online_players: bool,
     pub seed: Option<MinecraftSeed>,
     pub eula: bool,
     pub ip: Option<String>,
@@ -384,6 +386,8 @@ impl Default for ManifestServer {
             level_type: MinecraftLevelKind::Normal,
             hardcore: false,
             allow_list: true,
+            online_mode: true,
+            hide_online_players: true,
             seed: None,
             eula: false,
             ip: None,
@@ -400,12 +404,6 @@ impl Default for ManifestServer {
 impl ManifestServer {
     pub fn property_overrides(&self) -> McResult<BTreeMap<String, String>> {
         Ok(self.properties.clone())
-    }
-
-    pub fn online_mode(&self) -> bool {
-        self.properties
-            .get("online-mode")
-            .is_none_or(|value| value != "false")
     }
 
     /// The level the server's own `op` command grants.
@@ -443,6 +441,10 @@ impl RawServer {
             level_type: parse_or(self.level_type, defaults.level_type)?,
             hardcore: self.hardcore.unwrap_or(defaults.hardcore),
             allow_list: self.allow_list.unwrap_or(defaults.allow_list),
+            online_mode: self.online_mode.unwrap_or(defaults.online_mode),
+            hide_online_players: self
+                .hide_online_players
+                .unwrap_or(defaults.hide_online_players),
             seed: self.seed.map(|seed| match seed {
                 RawSeed::Numeric(seed) => MinecraftSeed::Numeric(seed),
                 RawSeed::Text(seed) => MinecraftSeed::Text(seed)

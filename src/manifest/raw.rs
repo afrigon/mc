@@ -58,6 +58,8 @@ pub struct RawServer {
     pub level_type: Option<String>,
     pub hardcore: Option<bool>,
     pub allow_list: Option<bool>,
+    pub online_mode: Option<bool>,
+    pub hide_online_players: Option<bool>,
     pub seed: Option<RawSeed>,
     pub eula: Option<bool>,
     pub ip: Option<String>,
