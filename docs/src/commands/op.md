@@ -19,9 +19,11 @@ operator with the default settings is applied immediately. A custom level
 or the player limit bypass cannot be applied live and takes effect at the
 next restart, which is reported with a warning.
 
+Every player named in one command gets the same settings.
+
 ```console
 $ mc op add Notch
-$ mc op add jeb_ --level 2 --bypass-player-limit
+$ mc op add jeb_ Dinnerbone --level 2 --bypass-player-limit
 ```
 
 ### Options
