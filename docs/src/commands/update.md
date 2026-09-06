@@ -14,6 +14,7 @@ The new versions are installed the next time the instance starts.
 ## Options
 
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 
 ## Examples
 

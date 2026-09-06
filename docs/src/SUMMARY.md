@@ -8,6 +8,7 @@
 
 - [Guides](./guides.md)
     - [Managing Mods](./guides/mods.md)
+    - [Players](./guides/players.md)
     - [Backups](./guides/backups.md)
     - [Running under systemd](./guides/systemd.md)
     - [Tunnels](./guides/tunnel.md)
@@ -27,6 +28,9 @@
         - [mc add](./commands/add.md)
         - [mc remove](./commands/remove.md)
         - [mc update](./commands/update.md)
+        - [mc allow](./commands/allow.md)
+        - [mc ban](./commands/ban.md)
+        - [mc op](./commands/op.md)
     - [Instance Commands](./commands/instance.md)
         - [mc run](./commands/run.md)
         - [mc backup](./commands/backup.md)

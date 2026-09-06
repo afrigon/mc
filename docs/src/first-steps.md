@@ -77,13 +77,16 @@ The console is attached to your terminal. Stop the instance with `Ctrl-C`:
 mc asks it to save the world and waits for it to exit cleanly.
 
 Note that the allow list is enabled by default, so players must be on it
-before they can join. To open the instance to everyone instead, set
-`allow-list #false` in the `server` section.
+before they can join. Add them with [`mc allow add`](./commands/allow.md).
+To open the instance to everyone instead, set `allow-list #false` in the
+`server` section.
 
 ## Next steps
 
 - add or update mods with [`mc add`](./commands/add.md) and
   [`mc update`](./commands/update.md) — see [Managing Mods](./guides/mods.md)
+- decide who may join and who holds commands — see
+  [Players](./guides/players.md)
 - configure world [Backups](./guides/backups.md)
 - let players outside your network join — see [Tunnels](./guides/tunnel.md)
 - deploy the instance as a service — see

@@ -22,8 +22,11 @@ use tracing::debug;
 use crate::cli::Cli;
 use crate::cli::CommandHandler;
 use crate::cli::commands::CliCommand;
+use crate::cli::commands::allow::AllowSubcommand;
+use crate::cli::commands::ban::BanSubcommand;
 use crate::cli::commands::java::JavaSubcommand;
 use crate::cli::commands::minecraft::MinecraftSubcommand;
+use crate::cli::commands::op::OpSubcommand;
 use crate::cli::commands::tunnel::TunnelSubcommand;
 use crate::context::McContext;
 use crate::utils::errors::CliError;
@@ -110,6 +113,21 @@ async fn run(cli: &Cli, context: &mut McContext) -> CliResult {
         CliCommand::Add(command) => command.handle(context).await,
         CliCommand::Remove(command) => command.handle(context).await,
         CliCommand::Update(command) => command.handle(context).await,
+        CliCommand::Allow(command) => match &command.command {
+            AllowSubcommand::Add(command) => command.handle(context).await,
+            AllowSubcommand::Remove(command) => command.handle(context).await,
+            AllowSubcommand::List(command) => command.handle(context).await
+        },
+        CliCommand::Ban(command) => match &command.command {
+            BanSubcommand::Add(command) => command.handle(context).await,
+            BanSubcommand::Remove(command) => command.handle(context).await,
+            BanSubcommand::List(command) => command.handle(context).await
+        },
+        CliCommand::Op(command) => match &command.command {
+            OpSubcommand::Add(command) => command.handle(context).await,
+            OpSubcommand::Remove(command) => command.handle(context).await,
+            OpSubcommand::List(command) => command.handle(context).await
+        },
         CliCommand::Backup(command) => command.handle(context).await,
         CliCommand::Restore(command) => command.handle(context).await,
         CliCommand::Completions(command) => command.handle(context).await

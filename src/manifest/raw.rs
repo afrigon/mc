@@ -28,7 +28,10 @@ pub struct RawManifest {
     #[serde(default)]
     pub notifications: RawNotifications,
 
-    pub tunnel: Option<RawTunnel>
+    pub tunnel: Option<RawTunnel>,
+
+    #[serde(default)]
+    pub players: RawPlayers
 }
 
 #[derive(Deserialize, Default)]
@@ -126,12 +129,49 @@ pub struct RawTunnel {
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawPlayers {
+    pub allow: Option<BTreeMap<String, RawAllowEntry>>,
+    pub ban: Option<BTreeMap<String, RawBanEntry>>,
+    pub ban_ip: Option<BTreeMap<String, RawBanEntry>>,
+    pub op: Option<BTreeMap<String, RawOpEntry>>
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawAllowEntry {}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawBanEntry {
+    pub reason: Option<String>,
+    pub created: Option<String>,
+    pub expires: Option<String>
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawOpEntry {
+    pub level: Option<u8>,
+    pub bypasses_player_limit: Option<bool>
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RawLockfile {
     #[serde(default)]
     pub modrinth: BTreeMap<String, RawLockEntry>,
 
     #[serde(default)]
-    pub http: BTreeMap<String, RawLockEntry>
+    pub http: BTreeMap<String, RawLockEntry>,
+
+    #[serde(default)]
+    pub players: BTreeMap<String, RawPlayerLockEntry>
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub struct RawPlayerLockEntry {
+    pub uuid: Option<String>
 }
 
 #[derive(Deserialize)]

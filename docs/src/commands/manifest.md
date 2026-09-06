@@ -6,3 +6,6 @@ Commands that create or edit `mc.kdl`:
 - [mc add](./add.md) — add mods to the manifest.
 - [mc remove](./remove.md) — remove mods from the manifest.
 - [mc update](./update.md) — update pinned mod versions.
+- [mc allow](./allow.md) — manage the allow list.
+- [mc ban](./ban.md) — manage the ban list.
+- [mc op](./op.md) — manage the operators.

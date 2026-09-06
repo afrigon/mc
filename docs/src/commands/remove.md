@@ -14,6 +14,7 @@ lockfile and is uninstalled along with it.
 ## Options
 
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 
 ## Examples
 

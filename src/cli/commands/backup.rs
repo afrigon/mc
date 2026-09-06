@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-
 use anyhow::Context;
 use clap::Args;
 use tokio_util::sync::CancellationToken;
 
 use crate::cli::CommandHandler;
+use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::manifest::Manifest;
 use crate::minecraft::server_properties::ServerProperties;
@@ -15,14 +14,8 @@ use crate::utils::process::ShutdownSignals;
 
 #[derive(Args)]
 pub struct BackupCommand {
-    /// Path to mc.kdl
-    #[arg(
-        long,
-        default_value = "./mc.kdl",
-        hide_default_value = true,
-        value_name = "PATH"
-    )]
-    pub manifest_path: PathBuf,
+    #[command(flatten)]
+    pub manifest: ManifestArgs,
 
     /// Name the backup instead of timestamping it; named backups are kept
     /// forever, exempt from the retention limit
@@ -32,7 +25,7 @@ pub struct BackupCommand {
 
 impl CommandHandler for BackupCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
-        let manifest_string = tokio::fs::read_to_string(&self.manifest_path)
+        let manifest_string = tokio::fs::read_to_string(&self.manifest.manifest_path)
             .await
             .context("could not find mc.kdl file")?;
         let manifest = Manifest::from_kdl_str(&manifest_string)

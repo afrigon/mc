@@ -4,7 +4,9 @@
   global options.
 - [Manifest Commands](./commands/manifest.md) — create and edit `mc.kdl`:
   [`mc init`](./commands/init.md), [`mc add`](./commands/add.md),
-  [`mc remove`](./commands/remove.md), [`mc update`](./commands/update.md).
+  [`mc remove`](./commands/remove.md), [`mc update`](./commands/update.md),
+  [`mc allow`](./commands/allow.md), [`mc ban`](./commands/ban.md),
+  [`mc op`](./commands/op.md).
 - [Instance Commands](./commands/instance.md) — operate the instance:
   [`mc run`](./commands/run.md), [`mc backup`](./commands/backup.md),
   [`mc restore`](./commands/restore.md).

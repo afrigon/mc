@@ -268,6 +268,53 @@ backups {
 
 See the [Backups](../guides/backups.md) guide for the full picture.
 
+## `players`
+
+Who may join, who is kept out, and who holds server commands. Each group
+lists players as nodes named after them; a name that starts with a digit
+must be quoted. Options ride on the node as properties.
+
+```kdl
+players {
+    allow {
+        Notch
+        "123abc"
+    }
+
+    ban {
+        Griefer reason="stole the beacon" created="2026-09-06T14:00:00Z" expires="2026-10-01T00:00:00Z"
+    }
+
+    ban-ip {
+        "203.0.113.7" reason="bot traffic"
+    }
+
+    op {
+        Notch level=4 bypasses-player-limit=#true
+        jeb_
+    }
+}
+```
+
+- `allow` — players permitted to join while `allow-list` in `server` is
+  `#true`, which it is by default. Entries take no properties.
+- `ban` — players refused by the server. `reason` is shown to the player
+  and defaults to the server's own wording; `created` records when the ban
+  was issued; `expires` lifts the ban at that time. Both dates are RFC 3339
+  timestamps. A player cannot be in both `allow` and `ban`.
+- `ban-ip` — addresses refused by the server, with the same properties as
+  `ban`. Node names are IP addresses and must be quoted.
+- `op` — operators. `level` is the permission level from `1` to `4` and
+  defaults to the server's `op-permission-level` property;
+  `bypasses-player-limit` lets the operator join when the server is full
+  and defaults to `#false`. Operators may join regardless of the allow
+  list.
+
+[`mc allow`](../commands/allow.md), [`mc ban`](../commands/ban.md), and
+[`mc op`](../commands/op.md) edit these groups for you and look names up as
+they go. The lists are written to the instance on every start — see
+[Players](../guides/players.md).
+
 ## `notifications`
 
 Webhook notifications about the instance. A provider is activated by

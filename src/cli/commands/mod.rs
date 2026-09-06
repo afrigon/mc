@@ -1,9 +1,12 @@
 pub mod add;
+pub mod allow;
 pub mod backup;
+pub mod ban;
 pub mod completions;
 pub mod init;
 pub mod java;
 pub mod minecraft;
+pub mod op;
 pub mod remove;
 pub mod restore;
 pub mod run;
@@ -13,11 +16,14 @@ pub mod update;
 use clap::Subcommand;
 
 use crate::cli::commands::add::AddCommand;
+use crate::cli::commands::allow::AllowCommand;
 use crate::cli::commands::backup::BackupCommand;
+use crate::cli::commands::ban::BanCommand;
 use crate::cli::commands::completions::CompletionsCommand;
 use crate::cli::commands::init::InitCommand;
 use crate::cli::commands::java::JavaCommand;
 use crate::cli::commands::minecraft::MinecraftCommand;
+use crate::cli::commands::op::OpCommand;
 use crate::cli::commands::remove::RemoveCommand;
 use crate::cli::commands::restore::RestoreCommand;
 use crate::cli::commands::run::RunCommand;
@@ -46,6 +52,12 @@ pub enum CliCommand {
 
     /// Update all mods to their latest version for the configured Minecraft version
     Update(UpdateCommand),
+
+    Allow(AllowCommand),
+
+    Ban(BanCommand),
+
+    Op(OpCommand),
 
     /// Start a backup of the world files
     Backup(BackupCommand),
