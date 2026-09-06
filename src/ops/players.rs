@@ -186,6 +186,14 @@ fn describe_ban(ban: &ManifestBan) -> String {
 
 // ALLOW
 
+fn warn_when_allow_list_is_off(context: &mut McContext, manifest: &Manifest) {
+    if !manifest.server.allow_list {
+        _ = context.shell().warn(
+            "the allow list is off, so anyone can join; set `allow-list #true` in the `server` section of `mc.kdl` to enforce it"
+        );
+    }
+}
+
 pub struct AllowAddOptions {
     pub names: Vec<String>,
     pub paths: PlayerPaths
@@ -195,6 +203,8 @@ pub async fn allow_add(context: &mut McContext, options: &AllowAddOptions) -> Mc
     let mut workspace = load(&options.paths).await?;
     let online_mode = workspace.manifest.server.online_mode();
     let mut added = Vec::new();
+
+    warn_when_allow_list_is_off(context, &workspace.manifest);
 
     for name in &options.names {
         if let Some(existing) = find_name(&workspace.manifest.players.allow, name) {
@@ -251,6 +261,8 @@ pub struct AllowRemoveOptions {
 pub async fn allow_remove(context: &mut McContext, options: &AllowRemoveOptions) -> McResult<()> {
     let mut workspace = load(&options.paths).await?;
     let mut removed = Vec::new();
+
+    warn_when_allow_list_is_off(context, &workspace.manifest);
 
     for name in &options.names {
         let existing = find_name(&workspace.manifest.players.allow, name)

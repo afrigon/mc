@@ -19,6 +19,10 @@ When the instance is running and its remote console is reachable, the
 change is applied to it immediately. Otherwise it takes effect the next
 time the instance starts.
 
+The list is still edited when `allow-list` in the `server` section is
+`#false`, but a warning points out that anyone can join until it is
+turned back on.
+
 ```console
 $ mc allow add Notch jeb_
 ```
