@@ -179,7 +179,7 @@ impl Default for ServerProperties {
     }
 }
 
-pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 15] = [
+pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 16] = [
     ("difficulty", "set `difficulty` in `server` instead"),
     (
         "enable-rcon",
@@ -192,6 +192,10 @@ pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 15] = [
     ("level-type", "set `level-type` in `server` instead"),
     ("max-players", "set `capacity` in `server` instead"),
     ("motd", "set `description` at the top level instead"),
+    (
+        "rcon.password",
+        "set `MC_RCON_PASSWORD` in the environment instead"
+    ),
     ("rcon.port", "set `rcon-port` in `server` instead"),
     ("server-ip", "set `ip` in `server` instead"),
     ("server-port", "set `port` in `server` instead"),

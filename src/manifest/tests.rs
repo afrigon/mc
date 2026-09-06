@@ -424,6 +424,20 @@ fn managed_property_is_rejected() {
 }
 
 #[test]
+fn rcon_password_property_is_rejected() {
+    let source =
+        with_section("server {\n    properties {\n        \"rcon.password\" \"hunter2\"\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains(
+            "the `rcon.password` entry in `properties` is managed by mc; set `MC_RCON_PASSWORD` in the environment instead"
+        ),
+        "{message}"
+    );
+}
+
+#[test]
 fn enable_rcon_property_is_rejected() {
     let source = with_section("server {\n    properties {\n        enable-rcon #true\n    }\n}");
     let message = error_message(Manifest::from_kdl_str(&source));

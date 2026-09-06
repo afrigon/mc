@@ -13,17 +13,25 @@ java {
     version "graal@25"
     min-memory 4096
     max-memory 4096
+    jvm-arguments "-Djava.net.preferIPv6Addresses=true" "-XX:+AlwaysPreTouch" "-Djdk.graal.TuneInlinerExploration=1"
 }
 
 minecraft {
-    version "..."
+    version "latest"
     loader "fabric"
 }
 
 server {
     gamemode "survival"
     difficulty "normal"
+    level-type "minecraft:normal"
+    hardcore #false
     allow-list #true
+    port 25565
+    rcon-port 25575
+    capacity 20
+    view-distance 16
+    simulation-distance 16
     eula #true
 
     properties {
@@ -42,6 +50,14 @@ backups {
     frequency "0 0 * * * *"
     keep 20
     local "backups"
+}
+
+notifications {
+    on-lifecycle-event #true
+    on-panic #true
+    on-sigkill #true
+    on-backup #true
+    on-backup-failure #true
 }
 ```
 
@@ -129,7 +145,10 @@ through `properties`.
   (`level-type`)
 - `hardcore` — defaults to `#false`. (`hardcore`)
 - `allow-list` — whether players must be on the allow list before they can
-  join. Defaults to `#true`. (`white-list`)
+  join. Defaults to `#true`. (`white-list`) Enabling it also sets
+  `enforce-whitelist`, so a player removed from the list is kicked at once;
+  disabling it clears both. `enforce-whitelist` is not managed, so an entry
+  for it in `properties` overrides that half on its own.
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the
