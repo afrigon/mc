@@ -39,6 +39,7 @@ pub struct ApplyPlayersOptions {
     pub instance_path: PathBuf,
     pub lockfile_path: PathBuf,
     pub online_mode: bool,
+    pub allow_list: bool,
     pub server_level: MinecraftPermission
 }
 
@@ -117,11 +118,17 @@ pub async fn apply(
     players::write_list(instance_path, players::BAN_IP_FILE, &ban_ip).await?;
     players::write_list(instance_path, players::OP_FILE, &op).await?;
 
+    let allowed = if options.allow_list {
+        format!("{} allowed", allow.len())
+    } else {
+        String::from("allow list off")
+    };
+
     _ = context.shell().status(
         "Players",
         format!(
-            "{} allowed, {} banned, {} operators",
-            allow.len(),
+            "{}, {} banned, {} operators",
+            allowed,
             ban.len() + ban_ip.len(),
             op.len()
         )
