@@ -28,6 +28,7 @@ server {
     hardcore #false
     allow-list #true
     online-mode #true
+    hide-online-players #true
     port 25565
     rcon-port 25575
     capacity 20
@@ -154,6 +155,9 @@ through `properties`.
   to `#true`. (`online-mode`) See
   [Offline mode](../guides/players.md#offline-mode) for how it changes the
   way players are identified.
+- `hide-online-players` — whether the server list ping leaves out the names
+  of the players online. The player count stays visible. Defaults to
+  `#true`. (`hide-online-players`)
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the

@@ -48,6 +48,7 @@ server {
     hardcore #true
     allow-list #false
     online-mode #false
+    hide-online-players #false
     seed -1412583731547517931
     ip "0.0.0.0"
     port 25566
@@ -162,6 +163,7 @@ fn full_manifest_decodes() -> McResult<()> {
     assert!(manifest.server.hardcore);
     assert!(!manifest.server.allow_list);
     assert!(!manifest.server.online_mode);
+    assert!(!manifest.server.hide_online_players);
     assert_eq!(
         manifest.server.seed,
         Some(MinecraftSeed::Numeric(-1412583731547517931))
@@ -356,6 +358,7 @@ fn minimal_manifest_uses_defaults() -> McResult<()> {
     assert!(!manifest.server.eula);
     assert!(manifest.server.allow_list);
     assert!(manifest.server.online_mode);
+    assert!(manifest.server.hide_online_players);
     assert_eq!(manifest.server.port, 25565);
     assert!(manifest.server.property_overrides()?.is_empty());
     assert!(manifest.mods.is_empty());
@@ -565,6 +568,20 @@ fn online_mode_property_is_rejected() {
 
     assert!(
         message.contains("the `online-mode` entry in `properties` is managed by mc; set `online-mode` in `server` instead"),
+        "{message}"
+    );
+}
+
+#[test]
+fn hide_online_players_property_is_rejected() {
+    let source =
+        with_section("server {\n    properties {\n        hide-online-players #false\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains(
+            "the `hide-online-players` entry in `properties` is managed by mc; set `hide-online-players` in `server` instead"
+        ),
         "{message}"
     );
 }
