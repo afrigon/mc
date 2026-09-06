@@ -18,11 +18,12 @@ use crate::utils::csv::SeparatedList;
 use crate::utils::errors::McResult;
 
 // Mirrors the vanilla server.properties keys and defaults as of Minecraft Java
-// Edition 26.3, per https://minecraft.wiki/w/Server.properties. To sync with a
-// later Minecraft version: read that page's History section for every key
-// added, removed, or defaulted differently after 26.3, mirror each change in
-// both the struct fields (alphabetical by serialized kebab-case name) and the
-// `Default` impl below, then bump the version in this comment.
+// Edition 26.3, per https://minecraft.wiki/w/Server.properties, except the
+// fields commented inline in `Default`. To sync with a later Minecraft version:
+// read that page's History section for every key added, removed, or defaulted
+// differently after 26.3, mirror each change in both the struct fields
+// (alphabetical by serialized kebab-case name) and the `Default` impl below,
+// then bump the version in this comment.
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerProperties {
@@ -120,6 +121,8 @@ impl Default for ServerProperties {
             enable_rcon: false,
             enable_status: true,
             enforce_secure_profile: true,
+            // Vanilla leaves removed players connected; kicking them at once is
+            // what an allow list is expected to do.
             enforce_whitelist: true,
             entity_broadcast_range_percentage: 100,
             force_gamemode: false,
@@ -169,6 +172,8 @@ impl Default for ServerProperties {
             server_ip: Some(String::from("::")),
             server_port: 25565,
             simulation_distance: 16,
+            // Vanilla protects 16 blocks around spawn from non-operators, which
+            // gets in the way of building there on a private server.
             spawn_protection: 0,
             status_heartbeat_interval: 0,
             sync_chunk_writes: true,
