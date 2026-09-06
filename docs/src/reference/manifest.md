@@ -192,7 +192,8 @@ exactly when an RCON password is configured (see
 [Environment Variables](./environment-variables.md)).
 
 Every key not written here takes the vanilla default as of Minecraft 26.3,
-with three exceptions:
+listed on the [`server.properties`](https://minecraft.wiki/w/Server.properties)
+wiki page, with three exceptions:
 
 - `enforce-whitelist` — follows `allow-list`, so `#true` by default.
 - `server-ip` — `"::"`, all addresses, IPv6 included; driven by `ip`.
