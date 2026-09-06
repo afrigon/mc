@@ -256,7 +256,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     let apply_players_options = ApplyPlayersOptions {
         instance_path: instance_path.clone(),
         lockfile_path: options.paths.lockfile_path.clone(),
-        online_mode: manifest.server.online_mode(),
+        online_mode: manifest.server.online_mode,
         allow_list: manifest.server.allow_list,
         server_level: manifest.server.op_permission_level()
     };

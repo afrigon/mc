@@ -27,6 +27,7 @@ server {
     level-type "minecraft:normal"
     hardcore #false
     allow-list #true
+    online-mode #true
     port 25565
     rcon-port 25575
     capacity 20
@@ -149,6 +150,10 @@ through `properties`.
   `enforce-whitelist`, so a player removed from the list is kicked at once;
   disabling it clears both. `enforce-whitelist` is not managed, so an entry
   for it in `properties` overrides that half on its own.
+- `online-mode` — whether the server verifies accounts with Mojang. Defaults
+  to `#true`. (`online-mode`) See
+  [Offline mode](../guides/players.md#offline-mode) for how it changes the
+  way players are identified.
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the

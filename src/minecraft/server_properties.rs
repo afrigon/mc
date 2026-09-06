@@ -179,7 +179,7 @@ impl Default for ServerProperties {
     }
 }
 
-pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 16] = [
+pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 17] = [
     ("difficulty", "set `difficulty` in `server` instead"),
     (
         "enable-rcon",
@@ -192,6 +192,7 @@ pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 16] = [
     ("level-type", "set `level-type` in `server` instead"),
     ("max-players", "set `capacity` in `server` instead"),
     ("motd", "set `description` at the top level instead"),
+    ("online-mode", "set `online-mode` in `server` instead"),
     (
         "rcon.password",
         "set `MC_RCON_PASSWORD` in the environment instead"
@@ -223,6 +224,7 @@ pub struct ManagedServerProperties {
     pub level_type: MinecraftLevelKind,
     pub max_players: i32,
     pub motd: String,
+    pub online_mode: bool,
 
     #[serde(rename = "rcon.password", skip_serializing_if = "Option::is_none")]
     pub rcon_password: Option<String>,
@@ -253,6 +255,7 @@ impl ManagedServerProperties {
             level_type: manifest.server.level_type,
             max_players: manifest.server.capacity.max(0),
             motd: manifest.description.clone(),
+            online_mode: manifest.server.online_mode,
             rcon_password,
             rcon_port: manifest.server.rcon_port,
             server_ip: manifest.server.ip.clone(),

@@ -67,7 +67,7 @@ to keep them.
 
 ## Offline mode
 
-An instance with `online-mode #false` in the `properties` block of the
-`server` section does not verify accounts, and the server identifies
-players by name alone. mc derives the identity the server expects from the
-name, so no lookup happens and any name is accepted.
+An instance with `online-mode #false` in the `server` section does not
+verify accounts, and the server identifies players by name alone. mc
+derives the identity the server expects from the name, so no lookup happens
+and any name is accepted.
