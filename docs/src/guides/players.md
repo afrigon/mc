@@ -23,8 +23,8 @@ players {
 
 See [The Manifest Format](../reference/manifest.md) for every key. The
 allow list is enabled by default; to open the instance to everyone, set
-`white-list #false` in the `properties` block of the `server` section.
-Operators may join regardless of the allow list.
+`allow-list #false` in the `server` section. Operators may join regardless
+of the allow list.
 
 ## Editing the lists
 

@@ -39,6 +39,7 @@ use crate::minecraft::MinecraftLevelKind;
 use crate::minecraft::MinecraftPermission;
 use crate::minecraft::players;
 use crate::minecraft::seed::MinecraftSeed;
+use crate::minecraft::server_properties::MANAGED_PROPERTY_KEYS;
 use crate::mods::loader::LoaderKind;
 use crate::ops::backups::BackupStorage;
 use crate::ops::notifications::NotificationKind;
@@ -355,6 +356,7 @@ pub struct ManifestServer {
     pub difficulty: MinecraftDifficulty,
     pub level_type: MinecraftLevelKind,
     pub hardcore: bool,
+    pub allow_list: bool,
     pub seed: Option<MinecraftSeed>,
     pub eula: bool,
     pub ip: Option<String>,
@@ -373,6 +375,7 @@ impl Default for ManifestServer {
             difficulty: MinecraftDifficulty::Normal,
             level_type: MinecraftLevelKind::Normal,
             hardcore: false,
+            allow_list: true,
             seed: None,
             eula: false,
             ip: None,
@@ -416,11 +419,22 @@ impl RawServer {
             flatten_properties(None, raw_properties, &mut properties)?;
         }
 
+        for (key, hint) in MANAGED_PROPERTY_KEYS {
+            if properties.contains_key(key) {
+                anyhow::bail!(
+                    "the `{}` entry in `properties` is managed by mc; {}",
+                    key,
+                    hint
+                );
+            }
+        }
+
         Ok(ManifestServer {
             gamemode: parse_or(self.gamemode, defaults.gamemode)?,
             difficulty: parse_or(self.difficulty, defaults.difficulty)?,
             level_type: parse_or(self.level_type, defaults.level_type)?,
             hardcore: self.hardcore.unwrap_or(defaults.hardcore),
+            allow_list: self.allow_list.unwrap_or(defaults.allow_list),
             seed: self.seed.map(|seed| match seed {
                 RawSeed::Numeric(seed) => MinecraftSeed::Numeric(seed),
                 RawSeed::Text(seed) => MinecraftSeed::Text(seed)

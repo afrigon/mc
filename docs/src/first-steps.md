@@ -78,8 +78,8 @@ mc asks it to save the world and waits for it to exit cleanly.
 
 Note that the allow list is enabled by default, so players must be on it
 before they can join. Add them with [`mc allow add`](./commands/allow.md).
-To open the instance to everyone instead, set `white-list #false` in the
-`properties` block of the `server` section.
+To open the instance to everyone instead, set `allow-list #false` in the
+`server` section.
 
 ## Next steps
 

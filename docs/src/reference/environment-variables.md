@@ -9,8 +9,9 @@ Layout](./instance-layout.md)).
 ## `MC_RCON_PASSWORD`
 
 The password for RCON, the remote console protocol used to coordinate
-backups with a running instance. It takes precedence over a
-`"rcon.password"` entry in the `properties` block of the `server` section.
+backups with a running instance. The environment is the only place it is
+read from: a `"rcon.password"` entry in the `properties` block of the
+`server` section is rejected, so the secret never lands in the manifest.
 
 RCON is enabled exactly when a password is configured. When backups are
 enabled and no password is set anywhere, mc generates one at each start so

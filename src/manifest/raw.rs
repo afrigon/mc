@@ -57,6 +57,7 @@ pub struct RawServer {
     pub difficulty: Option<String>,
     pub level_type: Option<String>,
     pub hardcore: Option<bool>,
+    pub allow_list: Option<bool>,
     pub seed: Option<RawSeed>,
     pub eula: Option<bool>,
     pub ip: Option<String>,
