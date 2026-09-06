@@ -59,12 +59,6 @@ notifications {
     on-backup #true
     on-backup-failure #true
 }
-
-players {
-    allow {
-        Notch
-    }
-}
 ```
 
 ## `name` (required)

@@ -9,6 +9,9 @@ pub mod players;
 pub mod seed;
 pub mod server_properties;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Serialize, Copy, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum MinecraftDifficulty {

@@ -11,22 +11,30 @@ pub struct ResolvedPlayer {
     pub uuid: Uuid
 }
 
-/// Turns a name into the identity the server will see. Offline-mode servers
-/// derive it from the name; online-mode servers use the account's UUID,
-/// remembered in the lockfile so a start never depends on the lookup.
+/// Turns a name into the identity the server will see. An offline-mode
+/// server derives it from the name alone, so the lockfile, which remembers
+/// account identities, only applies to an online-mode server.
 pub async fn resolve(
     context: &McContext,
     lockfile: &mut Lockfile,
     name: &str,
     online_mode: bool
 ) -> McResult<ResolvedPlayer> {
-    if !online_mode {
-        return Ok(ResolvedPlayer {
+    if online_mode {
+        resolve_account(context, lockfile, name).await
+    } else {
+        Ok(ResolvedPlayer {
             name: name.to_owned(),
             uuid: players::offline_uuid(name)
-        });
+        })
     }
+}
 
+async fn resolve_account(
+    context: &McContext,
+    lockfile: &mut Lockfile,
+    name: &str
+) -> McResult<ResolvedPlayer> {
     let locked = lockfile
         .players
         .iter()

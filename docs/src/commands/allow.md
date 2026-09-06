@@ -47,7 +47,8 @@ $ mc allow remove Notch
 
 ### Options
 
-Same as `mc allow add`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 
 ## mc allow list
 
@@ -59,4 +60,5 @@ Prints the allowed players, one per line.
 
 ### Options
 
-Same as `mc allow add`.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.

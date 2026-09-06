@@ -6,12 +6,14 @@ use clap::Args;
 use clap::Subcommand;
 
 use crate::cli::CommandHandler;
-use crate::cli::commands::allow::PlayerPathArgs;
+use crate::cli::args::LockfileArgs;
+use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::ops;
-use crate::ops::players::BanAddOptions;
-use crate::ops::players::BanRemoveOptions;
 use crate::ops::players::PlayerListOptions;
+use crate::ops::players::PlayerPaths;
+use crate::ops::players::ban::BanAddOptions;
+use crate::ops::players::ban::BanRemoveOptions;
 use crate::utils::errors::CliError;
 use crate::utils::errors::CliResult;
 
@@ -37,7 +39,10 @@ pub enum BanSubcommand {
 #[derive(Args)]
 pub struct BanAddCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to ban
     #[arg(value_name = "NAME", required_unless_present = "addresses")]
@@ -78,10 +83,13 @@ impl CommandHandler for BanAddCommand {
             addresses: self.addresses.clone(),
             reason: self.reason.clone(),
             expires,
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::ban_add(context, &options).await?;
+        ops::players::ban::add(context, &options).await?;
 
         Ok(())
     }
@@ -90,7 +98,10 @@ impl CommandHandler for BanAddCommand {
 #[derive(Args)]
 pub struct BanRemoveCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to unban
     #[arg(value_name = "NAME", required_unless_present = "addresses")]
@@ -106,10 +117,13 @@ impl CommandHandler for BanRemoveCommand {
         let options = BanRemoveOptions {
             names: self.names.clone(),
             addresses: self.addresses.clone(),
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::ban_remove(context, &options).await?;
+        ops::players::ban::remove(context, &options).await?;
 
         Ok(())
     }
@@ -118,16 +132,22 @@ impl CommandHandler for BanRemoveCommand {
 #[derive(Args)]
 pub struct BanListCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs
 }
 
 impl CommandHandler for BanListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::ban_list(context, &options).await?;
+        ops::players::ban::list(context, &options).await?;
 
         Ok(())
     }

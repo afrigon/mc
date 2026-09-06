@@ -19,6 +19,7 @@ use crate::ops::backups::local::LocalBackupBackend;
 use crate::ops::backups::s3::S3BackupBackend;
 use crate::ops::lock::InstanceLocks;
 use crate::ops::notifications::Notifier;
+use crate::ops::server_state::connect_rcon;
 use crate::utils;
 use crate::utils::errors::McResult;
 use crate::utils::shell::Shell;
@@ -573,18 +574,4 @@ pub async fn undo_restore(context: &mut McContext, options: &UndoRestoreOptions)
     drop(world_guard);
 
     Ok(())
-}
-
-pub fn connect_rcon(port: u16, password: &str) -> Option<minecraft_client_rs::Client> {
-    let rcon_address = format!("127.0.0.1:{}", port);
-
-    let mut client = minecraft_client_rs::Client::new(rcon_address).ok()?;
-
-    if client.authenticate(password.to_string()).is_err() {
-        let _ = client.close();
-
-        None
-    } else {
-        Some(client)
-    }
 }

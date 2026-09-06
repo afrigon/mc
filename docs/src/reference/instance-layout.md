@@ -31,10 +31,11 @@ The manifest describing the instance — the only file you author. See
 
 ## `mc.lock`
 
-The lockfile, written in KDL: the fully resolved set of mods, including
-required dependencies, that the instance last started with, and the
-identity resolved for every player named in the manifest. Regenerated when
-the instance starts; the player commands add to it as they go.
+The lockfile, written in KDL. It holds the mods resolved from the manifest,
+including their required dependencies, and the identity resolved for every
+player named in the manifest. The mod entries are rewritten from the
+manifest's pinned versions on every start; the player entries are added by
+the player commands and by a start that meets a name not yet recorded.
 
 ## `.java/` and `.minecraft/`
 

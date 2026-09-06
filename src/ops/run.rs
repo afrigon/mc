@@ -422,7 +422,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             for _ in 0..60 {
                 tokio::time::sleep(Duration::from_secs(2)).await;
 
-                if let Some(mut rcon) = ops::backups::connect_rcon(rcon_port, &password) {
+                if let Some(mut rcon) = ops::server_state::connect_rcon(rcon_port, &password) {
                     if rcon.send_command("save-on".to_string()).is_ok() {
                         tracing::debug!("asserted auto-save at startup");
                     }

@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use chrono::DateTime;
+use chrono::SecondsFormat;
 use chrono::Utc;
 use url::Url;
 
@@ -655,8 +656,9 @@ fn parse_timestamp(value: Option<String>, key: &str) -> McResult<Option<DateTime
                 .map(|timestamp| timestamp.with_timezone(&Utc))
                 .with_context(|| {
                     format!(
-                        "`{}` must be an RFC 3339 timestamp such as `2026-01-31T00:00:00Z`",
-                        key
+                        "`{}` must be an RFC 3339 timestamp such as `{}`",
+                        key,
+                        Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
                     )
                 })
         })

@@ -50,7 +50,8 @@ $ mc op remove Notch
 
 ### Options
 
-- `--manifest-path <PATH>` and `--lockfile-path <PATH>` — as above.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 
 ## mc op list
 
@@ -62,4 +63,5 @@ Prints the operators, one per line with their effective permission level.
 
 ### Options
 
-- `--manifest-path <PATH>` and `--lockfile-path <PATH>` — as above.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.

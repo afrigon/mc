@@ -59,7 +59,8 @@ $ mc ban remove --ip 203.0.113.7
 ### Options
 
 - `--ip <ADDRESS>` — unban addresses instead of players. May be repeated.
-- `--manifest-path <PATH>` and `--lockfile-path <PATH>` — as above.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 
 ## mc ban list
 
@@ -72,4 +73,5 @@ the reason, when the ban was issued, and when it expires.
 
 ### Options
 
-- `--manifest-path <PATH>` and `--lockfile-path <PATH>` — as above.
+- `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
+- `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.

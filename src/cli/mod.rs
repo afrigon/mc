@@ -1,3 +1,4 @@
+pub mod args;
 pub mod commands;
 pub mod globals;
 pub mod styles;

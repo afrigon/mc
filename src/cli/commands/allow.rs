@@ -1,15 +1,15 @@
-use std::path::PathBuf;
-
 use clap::Args;
 use clap::Subcommand;
 
 use crate::cli::CommandHandler;
+use crate::cli::args::LockfileArgs;
+use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::ops;
-use crate::ops::players::AllowAddOptions;
-use crate::ops::players::AllowRemoveOptions;
 use crate::ops::players::PlayerListOptions;
 use crate::ops::players::PlayerPaths;
+use crate::ops::players::allow::AllowAddOptions;
+use crate::ops::players::allow::AllowRemoveOptions;
 use crate::utils::errors::CliResult;
 
 #[derive(Args)]
@@ -32,39 +32,12 @@ pub enum AllowSubcommand {
 }
 
 #[derive(Args)]
-pub struct PlayerPathArgs {
-    /// Path to mc.kdl
-    #[arg(
-        long,
-        default_value = "./mc.kdl",
-        hide_default_value = true,
-        value_name = "PATH"
-    )]
-    pub manifest_path: PathBuf,
-
-    /// Path to mc.lock
-    #[arg(
-        long,
-        default_value = "./mc.lock",
-        hide_default_value = true,
-        value_name = "PATH"
-    )]
-    pub lockfile_path: PathBuf
-}
-
-impl PlayerPathArgs {
-    pub fn paths(&self) -> PlayerPaths {
-        PlayerPaths {
-            manifest_path: self.manifest_path.clone(),
-            lockfile_path: self.lockfile_path.clone()
-        }
-    }
-}
-
-#[derive(Args)]
 pub struct AllowAddCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to allow
     #[arg(required = true, value_name = "NAME")]
@@ -75,10 +48,13 @@ impl CommandHandler for AllowAddCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = AllowAddOptions {
             names: self.names.clone(),
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::allow_add(context, &options).await?;
+        ops::players::allow::add(context, &options).await?;
 
         Ok(())
     }
@@ -87,7 +63,10 @@ impl CommandHandler for AllowAddCommand {
 #[derive(Args)]
 pub struct AllowRemoveCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to remove from the allow list
     #[arg(required = true, value_name = "NAME")]
@@ -98,10 +77,13 @@ impl CommandHandler for AllowRemoveCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = AllowRemoveOptions {
             names: self.names.clone(),
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::allow_remove(context, &options).await?;
+        ops::players::allow::remove(context, &options).await?;
 
         Ok(())
     }
@@ -110,16 +92,22 @@ impl CommandHandler for AllowRemoveCommand {
 #[derive(Args)]
 pub struct AllowListCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs
 }
 
 impl CommandHandler for AllowListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::allow_list(context, &options).await?;
+        ops::players::allow::list(context, &options).await?;
 
         Ok(())
     }

@@ -2,13 +2,15 @@ use clap::Args;
 use clap::Subcommand;
 
 use crate::cli::CommandHandler;
-use crate::cli::commands::allow::PlayerPathArgs;
+use crate::cli::args::LockfileArgs;
+use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::minecraft::MinecraftPermission;
 use crate::ops;
-use crate::ops::players::OpAddOptions;
-use crate::ops::players::OpRemoveOptions;
 use crate::ops::players::PlayerListOptions;
+use crate::ops::players::PlayerPaths;
+use crate::ops::players::op::OpAddOptions;
+use crate::ops::players::op::OpRemoveOptions;
 use crate::utils::errors::CliError;
 use crate::utils::errors::CliResult;
 
@@ -34,7 +36,10 @@ pub enum OpSubcommand {
 #[derive(Args)]
 pub struct OpAddCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to make operators
     #[arg(required = true, value_name = "NAME")]
@@ -61,10 +66,13 @@ impl CommandHandler for OpAddCommand {
             names: self.names.clone(),
             level,
             bypasses_player_limit: self.bypass_player_limit,
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::op_add(context, &options).await?;
+        ops::players::op::add(context, &options).await?;
 
         Ok(())
     }
@@ -73,7 +81,10 @@ impl CommandHandler for OpAddCommand {
 #[derive(Args)]
 pub struct OpRemoveCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs,
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs,
 
     /// Player names to remove from the operators
     #[arg(required = true, value_name = "NAME")]
@@ -84,10 +95,13 @@ impl CommandHandler for OpRemoveCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = OpRemoveOptions {
             names: self.names.clone(),
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::op_remove(context, &options).await?;
+        ops::players::op::remove(context, &options).await?;
 
         Ok(())
     }
@@ -96,16 +110,22 @@ impl CommandHandler for OpRemoveCommand {
 #[derive(Args)]
 pub struct OpListCommand {
     #[command(flatten)]
-    pub paths: PlayerPathArgs
+    pub manifest: ManifestArgs,
+
+    #[command(flatten)]
+    pub lockfile: LockfileArgs
 }
 
 impl CommandHandler for OpListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: self.paths.paths()
+            paths: PlayerPaths {
+                manifest_path: self.manifest.manifest_path.clone(),
+                lockfile_path: self.lockfile.lockfile_path.clone()
+            }
         };
 
-        ops::players::op_list(context, &options).await?;
+        ops::players::op::list(context, &options).await?;
 
         Ok(())
     }
