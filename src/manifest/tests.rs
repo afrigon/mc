@@ -1,16 +1,24 @@
+use std::collections::BTreeMap;
+
+use chrono::DateTime;
+use chrono::Utc;
 use kdl::KdlDocument;
 use url::Url;
+use uuid::Uuid;
 
 use crate::manifest::Manifest;
+use crate::manifest::ManifestBan;
 use crate::manifest::ManifestMod;
+use crate::manifest::ManifestOp;
 use crate::manifest::document;
-use crate::manifest::lock::ModLockfile;
+use crate::manifest::lock::Lockfile;
 use crate::manifest::lock::ModLockfileEntry;
 use crate::manifest::lock::ModLockfileSource;
 use crate::manifest::presets;
 use crate::minecraft::MinecraftDifficulty;
 use crate::minecraft::MinecraftGamemode;
 use crate::minecraft::MinecraftLevelKind;
+use crate::minecraft::MinecraftPermission;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::ops::backups::BackupStorage;
 use crate::utils::errors::McResult;
@@ -83,6 +91,27 @@ notifications {
 
 tunnel {
     provider "playit@1.0.10"
+}
+
+players {
+    allow {
+        Notch
+        "123abc"
+    }
+
+    ban {
+        Griefer reason="stole the beacon" created="2026-09-06T14:00:00Z" expires="2026-10-01T00:00:00Z"
+        Other
+    }
+
+    ban-ip {
+        "203.0.113.7" reason="bot traffic"
+    }
+
+    op {
+        Notch level=3 bypasses-player-limit=#true
+        jeb_
+    }
 }
 "#;
 
@@ -191,7 +220,119 @@ fn full_manifest_decodes() -> McResult<()> {
         Some("playit@1.0.10".parse()?)
     );
 
+    assert_eq!(
+        manifest.players.allow.iter().collect::<Vec<_>>(),
+        ["123abc", "Notch"]
+    );
+    assert_eq!(
+        manifest.players.ban.get("Griefer"),
+        Some(&ManifestBan {
+            reason: Some(String::from("stole the beacon")),
+            created: Some(
+                DateTime::parse_from_rfc3339("2026-09-06T14:00:00Z")?.with_timezone(&Utc)
+            ),
+            expires: Some(
+                DateTime::parse_from_rfc3339("2026-10-01T00:00:00Z")?.with_timezone(&Utc)
+            )
+        })
+    );
+    assert_eq!(
+        manifest.players.ban.get("Other"),
+        Some(&ManifestBan {
+            reason: None,
+            created: None,
+            expires: None
+        })
+    );
+    assert_eq!(
+        manifest
+            .players
+            .ban_ip
+            .get(&"203.0.113.7".parse()?)
+            .and_then(|ban| ban.reason.as_deref()),
+        Some("bot traffic")
+    );
+    assert_eq!(
+        manifest.players.op.get("Notch"),
+        Some(&ManifestOp {
+            level: Some(MinecraftPermission::Admin),
+            bypasses_player_limit: true
+        })
+    );
+    assert_eq!(
+        manifest.players.op.get("jeb_"),
+        Some(&ManifestOp {
+            level: None,
+            bypasses_player_limit: false
+        })
+    );
+
     Ok(())
+}
+
+#[test]
+fn player_allowed_and_banned_is_rejected() {
+    let source = with_section(
+        "players {\n    allow {\n        Notch\n    }\n    ban {\n        Notch\n    }\n}"
+    );
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the player `Notch` is both allowed and banned"),
+        "{message}"
+    );
+}
+
+#[test]
+fn op_level_out_of_range_is_rejected() {
+    let source = with_section("players {\n    op {\n        Notch level=5\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("`level` must be between 1 and 4"),
+        "{message}"
+    );
+}
+
+#[test]
+fn ban_timestamp_must_be_rfc3339() {
+    let source = with_section("players {\n    ban {\n        Notch expires=\"tomorrow\"\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("`expires` must be an RFC 3339 timestamp"),
+        "{message}"
+    );
+}
+
+#[test]
+fn banned_ip_must_be_an_address() {
+    let source = with_section("players {\n    ban-ip {\n        example.com\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("`example.com` is not an ip address"),
+        "{message}"
+    );
+}
+
+#[test]
+fn player_with_a_value_is_rejected_with_position() {
+    let source = with_section("players {\n    allow {\n        Notch \"x\"\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("line 5, column 9: `Notch` takes properties only"),
+        "{message}"
+    );
+}
+
+#[test]
+fn player_unknown_property_is_rejected() {
+    let source = with_section("players {\n    op {\n        Notch bogus=1\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(message.contains("unknown field `bogus`"), "{message}");
 }
 
 #[test]
@@ -486,7 +627,7 @@ fn slashdash_node_is_ignored() -> McResult<()> {
 
 #[test]
 fn lockfile_round_trips() -> McResult<()> {
-    let lockfile = ModLockfile {
+    let lockfile = Lockfile {
         mods: vec![
             ModLockfileEntry {
                 name: String::from("lithium"),
@@ -500,7 +641,11 @@ fn lockfile_round_trips() -> McResult<()> {
                 source: ModLockfileSource::Url(Url::parse("https://example.com/my-mod.jar")?),
                 hash: None
             },
-        ]
+        ],
+        players: BTreeMap::from([(
+            String::from("Notch"),
+            Uuid::parse_str("069a79f4-44e9-4726-a5be-fca90e38aaf5")?
+        )])
     };
 
     let text = lockfile.to_kdl_document().to_string();
@@ -513,10 +658,14 @@ fn lockfile_round_trips() -> McResult<()> {
          \n\
          http {\n\
          \x20   my-mod url=\"https://example.com/my-mod.jar\"\n\
+         }\n\
+         \n\
+         players {\n\
+         \x20   Notch uuid=\"069a79f4-44e9-4726-a5be-fca90e38aaf5\"\n\
          }\n"
     );
 
-    let parsed = ModLockfile::from_kdl_str(&text)?;
+    let parsed = Lockfile::from_kdl_str(&text)?;
 
     assert_eq!(parsed.mods.len(), 2);
     assert_eq!(parsed.mods[0].name, "lithium");
@@ -526,16 +675,17 @@ fn lockfile_round_trips() -> McResult<()> {
     assert_eq!(parsed.mods[1].name, "my-mod");
     assert_eq!(parsed.mods[1].version, None);
     assert_eq!(parsed.mods[1].source, lockfile.mods[1].source);
+    assert_eq!(parsed.players, lockfile.players);
 
     Ok(())
 }
 
 #[test]
 fn empty_lockfile_round_trips() -> McResult<()> {
-    let text = ModLockfile { mods: vec![] }.to_kdl_document().to_string();
+    let text = Lockfile::default().to_kdl_document().to_string();
 
     assert_eq!(text, "");
-    assert!(ModLockfile::from_kdl_str(&text)?.mods.is_empty());
+    assert!(Lockfile::from_kdl_str(&text)?.mods.is_empty());
 
     Ok(())
 }

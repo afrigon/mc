@@ -5,6 +5,7 @@ use serde::Serializer;
 
 pub mod eula;
 pub mod log4j;
+pub mod players;
 pub mod seed;
 pub mod server_properties;
 
@@ -105,6 +106,21 @@ impl Serialize for MinecraftPermission {
         S: Serializer
     {
         serializer.serialize_u8(*self as u8)
+    }
+}
+
+impl TryFrom<u8> for MinecraftPermission {
+    type Error = anyhow::Error;
+
+    fn try_from(level: u8) -> Result<Self, Self::Error> {
+        match level {
+            0 => Ok(MinecraftPermission::All),
+            1 => Ok(MinecraftPermission::Moderator),
+            2 => Ok(MinecraftPermission::Gamemaster),
+            3 => Ok(MinecraftPermission::Admin),
+            4 => Ok(MinecraftPermission::Owner),
+            _ => anyhow::bail!("permission level must be between 0 and 4")
+        }
     }
 }
 

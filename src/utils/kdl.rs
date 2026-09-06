@@ -17,6 +17,15 @@ const FLAG_NODES: &[&str] = &["on", "tunnel"];
 /// Nodes that take several values.
 const LIST_NODES: &[&str] = &["jvm-arguments"];
 
+/// Blocks whose children are named after players, carry properties only,
+/// and may stand alone.
+const PLAYER_GROUPS: &[&[&str]] = &[
+    &["players", "allow"],
+    &["players", "ban"],
+    &["players", "ban-ip"],
+    &["players", "op"]
+];
+
 pub fn parse_document(source: &str) -> McResult<KdlDocument> {
     KdlDocument::parse_v2(source).map_err(|error| {
         let mut message = String::from("could not parse the KDL document");
@@ -62,7 +71,7 @@ pub struct Validated {
 /// reads a bare node as `true`, so shape mistakes are caught here first,
 /// with positions.
 pub fn validate(source: &str, document: &KdlDocument) -> McResult<Validated> {
-    validate_nodes(source, document)?;
+    validate_nodes(source, document, &mut Vec::new())?;
 
     let bare_tunnel = document
         .get("tunnel")
@@ -71,8 +80,13 @@ pub fn validate(source: &str, document: &KdlDocument) -> McResult<Validated> {
     Ok(Validated { bare_tunnel })
 }
 
-fn validate_nodes(source: &str, document: &KdlDocument) -> McResult<()> {
+fn validate_nodes<'a>(
+    source: &str,
+    document: &'a KdlDocument,
+    path: &mut Vec<&'a str>
+) -> McResult<()> {
     let mut seen: Vec<&str> = Vec::new();
+    let player_entry = PLAYER_GROUPS.contains(&path.as_slice());
 
     for node in document.nodes() {
         let name = node.name().value();
@@ -106,7 +120,19 @@ fn validate_nodes(source: &str, document: &KdlDocument) -> McResult<()> {
                     );
                 }
 
-                validate_nodes(source, children)?;
+                path.push(name);
+                validate_nodes(source, children, path)?;
+                path.pop();
+            }
+            None if player_entry => {
+                if arguments > 0 {
+                    anyhow::bail!(
+                        "line {}, column {}: `{}` takes properties only, such as `reason=\"...\"`",
+                        line,
+                        column,
+                        name
+                    );
+                }
             }
             None => {
                 if node.entries().is_empty() && !FLAG_NODES.contains(&name) {

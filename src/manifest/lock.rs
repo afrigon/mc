@@ -1,18 +1,23 @@
+use std::collections::BTreeMap;
+
+use anyhow::Context;
 use kdl::KdlDocument;
 use url::Url;
+use uuid::Uuid;
 
 use crate::manifest::raw::RawLockfile;
 use crate::utils;
 use crate::utils::errors::McResult;
 use crate::utils::product_descriptor::RawProductDescriptor;
 
-#[derive(Debug)]
-pub struct ModLockfile {
-    pub mods: Vec<ModLockfileEntry>
+#[derive(Debug, Default)]
+pub struct Lockfile {
+    pub mods: Vec<ModLockfileEntry>,
+    pub players: BTreeMap<String, Uuid>
 }
 
-impl ModLockfile {
-    pub fn from_kdl_str(source: &str) -> McResult<ModLockfile> {
+impl Lockfile {
+    pub fn from_kdl_str(source: &str) -> McResult<Lockfile> {
         let raw: RawLockfile = utils::kdl::deserialize(source)?;
         let mut mods = Vec::new();
 
@@ -38,13 +43,26 @@ impl ModLockfile {
             });
         }
 
-        Ok(ModLockfile { mods })
+        let mut players = BTreeMap::new();
+
+        for (name, entry) in raw.players {
+            let uuid = entry
+                .uuid
+                .ok_or_else(|| anyhow::anyhow!("the locked player `{}` has no uuid", name))?
+                .parse()
+                .with_context(|| format!("the locked player `{}` has an invalid uuid", name))?;
+
+            players.insert(name, uuid);
+        }
+
+        Ok(Lockfile { mods, players })
     }
 
     pub fn to_kdl_document(&self) -> KdlDocument {
         let mut document = KdlDocument::new();
         let mut modrinth = utils::kdl::node("modrinth", 0);
         let mut http = utils::kdl::node("http", 0);
+        let mut players = utils::kdl::node("players", 0);
 
         for entry in &self.mods {
             let mut node = utils::kdl::node(&entry.name, 1);
@@ -73,7 +91,17 @@ impl ModLockfile {
             }
         }
 
-        for group in [modrinth, http] {
+        for (name, uuid) in &self.players {
+            let mut node = utils::kdl::node(name, 1);
+
+            node.push(utils::kdl::quoted_property(
+                "uuid",
+                &uuid.hyphenated().to_string()
+            ));
+            players.ensure_children().nodes_mut().push(node);
+        }
+
+        for group in [modrinth, http, players] {
             if group.children().is_some() {
                 let mut group = group;
 

@@ -13,7 +13,7 @@ use crate::crypto::checksum::LocalChecksum;
 use crate::manifest::Manifest;
 use crate::manifest::ManifestMod;
 use crate::manifest::document;
-use crate::manifest::lock::ModLockfile;
+use crate::manifest::lock::Lockfile;
 use crate::manifest::lock::ModLockfileEntry;
 use crate::manifest::lock::ModLockfileSource;
 use crate::mods::loader::LoaderKind;
@@ -203,12 +203,11 @@ pub async fn sync(
         let old_lockfile = tokio::fs::read_to_string(&options.lockfile_path)
             .await
             .ok()
-            .and_then(|s| ModLockfile::from_kdl_str(&s).ok())
-            .map(|lockfile| lockfile.mods)
+            .and_then(|s| Lockfile::from_kdl_str(&s).ok())
             .unwrap_or_default();
 
         for new in &mut new_lockfile {
-            for old in &old_lockfile {
+            for old in &old_lockfile.mods {
                 if old.name == new.name && old.version == new.version {
                     new.hash = old.hash.clone();
 
@@ -313,7 +312,10 @@ pub async fn sync(
             tokio::fs::remove_file(options.mods_path.join(name).with_extension("jar")).await?;
         }
 
-        let lockfile = ModLockfile { mods: new_lockfile };
+        let lockfile = Lockfile {
+            mods: new_lockfile,
+            players: old_lockfile.players
+        };
         tokio::fs::write(
             &options.lockfile_path,
             lockfile.to_kdl_document().to_string()

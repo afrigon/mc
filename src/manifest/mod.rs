@@ -7,21 +7,28 @@ mod raw;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::env;
+use std::net::IpAddr;
 use std::path::PathBuf;
 
 use anyhow::Context;
+use chrono::DateTime;
+use chrono::Utc;
 use url::Url;
 
 use crate::context::McContext;
 use crate::java::JavaDescriptor;
 use crate::manifest::raw::RawBackups;
+use crate::manifest::raw::RawBanEntry;
 use crate::manifest::raw::RawJava;
 use crate::manifest::raw::RawManifest;
 use crate::manifest::raw::RawMinecraft;
 use crate::manifest::raw::RawMods;
 use crate::manifest::raw::RawNotifications;
+use crate::manifest::raw::RawOpEntry;
+use crate::manifest::raw::RawPlayers;
 use crate::manifest::raw::RawProperty;
 use crate::manifest::raw::RawSeed;
 use crate::manifest::raw::RawServer;
@@ -29,6 +36,8 @@ use crate::manifest::raw::RawTunnel;
 use crate::minecraft::MinecraftDifficulty;
 use crate::minecraft::MinecraftGamemode;
 use crate::minecraft::MinecraftLevelKind;
+use crate::minecraft::MinecraftPermission;
+use crate::minecraft::players;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::mods::loader::LoaderKind;
 use crate::ops::backups::BackupStorage;
@@ -56,7 +65,8 @@ pub struct Manifest {
     pub mods: HashMap<String, ManifestMod>,
     pub backups: ManifestBackups,
     pub notifications: ManifestNotifications,
-    pub tunnel: Option<ManifestTunnel>
+    pub tunnel: Option<ManifestTunnel>,
+    pub players: ManifestPlayers
 }
 
 impl Manifest {
@@ -126,7 +136,11 @@ impl RawManifest {
                 .resolve()
                 .context("invalid `backups` section")?,
             notifications: self.notifications.resolve(),
-            tunnel
+            tunnel,
+            players: self
+                .players
+                .resolve()
+                .context("invalid `players` section")?
         })
     }
 }
@@ -504,6 +518,118 @@ impl RawBackups {
             enabled: self.on,
             frequency: self.frequency.unwrap_or(defaults.frequency),
             storage
+        })
+    }
+}
+
+#[derive(Default)]
+pub struct ManifestPlayers {
+    pub allow: BTreeSet<String>,
+    pub ban: BTreeMap<String, ManifestBan>,
+    pub ban_ip: BTreeMap<IpAddr, ManifestBan>,
+    pub op: BTreeMap<String, ManifestOp>
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ManifestBan {
+    pub reason: Option<String>,
+    pub created: Option<DateTime<Utc>>,
+    pub expires: Option<DateTime<Utc>>
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ManifestOp {
+    pub level: Option<MinecraftPermission>,
+    pub bypasses_player_limit: bool
+}
+
+impl RawPlayers {
+    fn resolve(self) -> McResult<ManifestPlayers> {
+        let mut allow = BTreeSet::new();
+
+        for name in self.allow.unwrap_or_default().into_keys() {
+            players::validate_name(&name)?;
+            allow.insert(name);
+        }
+
+        let mut ban = BTreeMap::new();
+
+        for (name, entry) in self.ban.unwrap_or_default() {
+            players::validate_name(&name)?;
+
+            if allow.contains(&name) {
+                anyhow::bail!("the player `{}` is both allowed and banned", name);
+            }
+
+            ban.insert(name, entry.resolve()?);
+        }
+
+        let mut ban_ip = BTreeMap::new();
+
+        for (address, entry) in self.ban_ip.unwrap_or_default() {
+            let address: IpAddr = address
+                .parse()
+                .with_context(|| format!("`{}` is not an ip address", address))?;
+
+            ban_ip.insert(address, entry.resolve()?);
+        }
+
+        let mut op = BTreeMap::new();
+
+        for (name, entry) in self.op.unwrap_or_default() {
+            players::validate_name(&name)?;
+            op.insert(name, entry.resolve()?);
+        }
+
+        Ok(ManifestPlayers {
+            allow,
+            ban,
+            ban_ip,
+            op
+        })
+    }
+}
+
+impl RawBanEntry {
+    fn resolve(self) -> McResult<ManifestBan> {
+        Ok(ManifestBan {
+            reason: self.reason,
+            created: parse_timestamp(self.created, "created")?,
+            expires: parse_timestamp(self.expires, "expires")?
+        })
+    }
+}
+
+fn parse_timestamp(value: Option<String>, key: &str) -> McResult<Option<DateTime<Utc>>> {
+    value
+        .map(|value| {
+            DateTime::parse_from_rfc3339(&value)
+                .map(|timestamp| timestamp.with_timezone(&Utc))
+                .with_context(|| {
+                    format!(
+                        "`{}` must be an RFC 3339 timestamp such as `2026-01-31T00:00:00Z`",
+                        key
+                    )
+                })
+        })
+        .transpose()
+}
+
+impl RawOpEntry {
+    fn resolve(self) -> McResult<ManifestOp> {
+        let level = self
+            .level
+            .map(|level| {
+                MinecraftPermission::try_from(level)
+                    .ok()
+                    .filter(|permission| *permission != MinecraftPermission::All)
+                    .ok_or_else(|| anyhow::anyhow!("`level` must be between 1 and 4"))
+            })
+            .transpose()?;
+
+        Ok(ManifestOp {
+            level,
+            bypasses_player_limit: self.bypasses_player_limit.unwrap_or(false)
         })
     }
 }
