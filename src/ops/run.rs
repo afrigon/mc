@@ -28,6 +28,7 @@ use crate::ops::lock::InstanceLocks;
 use crate::ops::minecraft::MinecraftInstallOptions;
 use crate::ops::mods::SyncModsOptions;
 use crate::ops::notifications::ServerEvent;
+use crate::ops::players::ApplyPlayersOptions;
 use crate::ops::tunnel::TunnelAgentOptions;
 use crate::ops::tunnel::TunnelClaimOptions;
 use crate::ops::tunnel::TunnelEnsureOptions;
@@ -265,6 +266,17 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     };
 
     ops::mods::sync(context, &sync_options, &manifest.mods).await?;
+
+    // PLAYERS
+
+    let apply_players_options = ApplyPlayersOptions {
+        instance_path: instance_path.clone(),
+        lockfile_path: options.lockfile_path.clone(),
+        online_mode: manifest.server.online_mode(),
+        server_level: manifest.server.op_permission_level()
+    };
+
+    ops::players::apply(context, &apply_players_options, &manifest.players).await?;
 
     let server_log_level = match context.log_level {
         tracing::Level::ERROR => "error",

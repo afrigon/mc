@@ -390,6 +390,21 @@ impl ManifestServer {
     pub fn property_overrides(&self) -> McResult<BTreeMap<String, String>> {
         Ok(self.properties.clone())
     }
+
+    pub fn online_mode(&self) -> bool {
+        self.properties
+            .get("online-mode")
+            .is_none_or(|value| value != "false")
+    }
+
+    /// The level the server's own `op` command grants.
+    pub fn op_permission_level(&self) -> MinecraftPermission {
+        self.properties
+            .get("op-permission-level")
+            .and_then(|value| value.parse::<u8>().ok())
+            .and_then(|level| MinecraftPermission::try_from(level).ok())
+            .unwrap_or(MinecraftPermission::Owner)
+    }
 }
 
 impl RawServer {
@@ -519,6 +534,25 @@ impl RawBackups {
             frequency: self.frequency.unwrap_or(defaults.frequency),
             storage
         })
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PlayerGroup {
+    Allow,
+    Ban,
+    BanIp,
+    Op
+}
+
+impl PlayerGroup {
+    pub fn node_name(&self) -> &'static str {
+        match self {
+            PlayerGroup::Allow => "allow",
+            PlayerGroup::Ban => "ban",
+            PlayerGroup::BanIp => "ban-ip",
+            PlayerGroup::Op => "op"
+        }
     }
 }
 

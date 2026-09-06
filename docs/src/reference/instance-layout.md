@@ -31,9 +31,10 @@ The manifest describing the instance — the only file you author. See
 
 ## `mc.lock`
 
-The mod lockfile, written in KDL: the fully resolved set of mods, including
-required dependencies, that the instance last started with. Regenerated when
-the instance starts.
+The lockfile, written in KDL: the fully resolved set of mods, including
+required dependencies, that the instance last started with, and the
+identity resolved for every player named in the manifest. Regenerated when
+the instance starts; the player commands add to it as they go.
 
 ## `.java/` and `.minecraft/`
 
@@ -74,9 +75,14 @@ The live working directory of the Minecraft process. Notable contents:
 - `mods/` — the installed mods. This directory is fully managed: mc adds and
   removes jars to match the lockfile, so a jar placed here by hand is
   deleted on the next start. Declare URL mods in the manifest instead.
+- `whitelist.json`, `banned-players.json`, `banned-ips.json`, `ops.json` —
+  the player lists, generated from the `players` section of the manifest on
+  every start. Changes the server writes to them on its own are replaced at
+  the next start; use [`mc allow`](../commands/allow.md),
+  [`mc ban`](../commands/ban.md), and [`mc op`](../commands/op.md) instead.
 - `myserver/` — the world, named after the instance's `name`. Everything
-  else Minecraft writes at runtime (logs, player data, allow list, and so on)
-  also lives here and is left untouched by mc.
+  else Minecraft writes at runtime (logs, player data, and so on) also lives
+  here and is left untouched by mc.
 
 ## `temp/`
 

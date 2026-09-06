@@ -1,8 +1,10 @@
 use kdl::KdlDocument;
 use kdl::KdlDocumentFormat;
+use kdl::KdlEntry;
 use kdl::KdlNode;
 use kdl::KdlNodeFormat;
 
+use crate::manifest::PlayerGroup;
 use crate::utils;
 use crate::utils::errors::McResult;
 use crate::utils::errors::internal;
@@ -19,7 +21,7 @@ fn ensure_block<'a>(
     if parent.get(name).is_none() {
         let mut block = utils::kdl::node(name, depth);
 
-        if depth == 0 {
+        if depth == 0 || !parent.nodes().is_empty() {
             utils::kdl::add_blank_line_before(&mut block);
         }
 
@@ -95,21 +97,45 @@ pub fn remove_mod(document: &mut KdlDocument, slug: &str) -> bool {
 
     for group in mods.nodes_mut() {
         if let Some(children) = group.children_mut() {
-            let before = children.nodes().len();
-
-            children
-                .nodes_mut()
-                .retain(|node| node.name().value() != slug);
-
-            removed |= children.nodes().len() != before;
-
-            if children.nodes().is_empty() {
-                keep_block_open(children);
-            }
+            removed |= remove_child(children, slug);
         }
     }
 
     removed
+}
+
+// The newline after `{` belongs to the first child's leading trivia, so
+// removing that child hands the line break to whichever child comes first
+// now, and removing the last one keeps the block from collapsing.
+fn remove_child(children: &mut KdlDocument, name: &str) -> bool {
+    let position = children
+        .nodes()
+        .iter()
+        .position(|node| node.name().value() == name);
+
+    let Some(position) = position else {
+        return false;
+    };
+
+    let removed = children.nodes_mut().remove(position);
+
+    match children.nodes_mut().first_mut() {
+        None => keep_block_open(children),
+        Some(first) if position == 0 => {
+            let line_break = removed
+                .format()
+                .and_then(|format| format.leading.split_inclusive('\n').next())
+                .filter(|prefix| prefix.ends_with('\n'))
+                .unwrap_or_default();
+
+            if let Some(format) = first.format_mut() {
+                format.leading = format!("{}{}", line_break, format.leading);
+            }
+        }
+        Some(_) => {}
+    }
+
+    true
 }
 
 // The newline after `{` belongs to the first child's leading trivia, so
@@ -124,4 +150,58 @@ fn keep_block_open(children: &mut KdlDocument) {
         leading: String::from("\n"),
         trailing
     });
+}
+
+/// Writes `name` into the player `group` with exactly `entries` as its
+/// properties, replacing the properties of an existing entry in place.
+pub fn set_player(
+    document: &mut KdlDocument,
+    group: PlayerGroup,
+    name: &str,
+    entries: Vec<KdlEntry>
+) -> McResult<()> {
+    let players = ensure_block(document, "players", 0)?;
+    let group = ensure_block(players, group.node_name(), 1)?;
+    let indentation = utils::kdl::indentation_of(group, 2);
+
+    match group.get_mut(name) {
+        Some(existing) => {
+            existing.entries_mut().clear();
+
+            for entry in entries {
+                existing.push(entry);
+            }
+        }
+        None => {
+            let mut node = KdlNode::new(name);
+
+            node.set_format(KdlNodeFormat {
+                leading: indentation,
+                terminator: String::from("\n"),
+                ..KdlNodeFormat::default()
+            });
+
+            for entry in entries {
+                node.push(entry);
+            }
+
+            group.nodes_mut().push(node);
+        }
+    }
+
+    Ok(())
+}
+
+/// Removes `name` from the player `group`.
+pub fn remove_player(document: &mut KdlDocument, group: PlayerGroup, name: &str) -> bool {
+    let Some(children) = document
+        .get_mut("players")
+        .and_then(|node| node.children_mut().as_mut())
+        .and_then(|players| players.get_mut(group.node_name()))
+        .and_then(|node| node.children_mut().as_mut())
+    else {
+        return false;
+    };
+
+    remove_child(children, name)
 }

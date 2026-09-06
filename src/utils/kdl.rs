@@ -5,6 +5,7 @@ use kdl::KdlEntry;
 use kdl::KdlEntryFormat;
 use kdl::KdlNode;
 use kdl::KdlNodeFormat;
+use kdl::KdlValue;
 use serde::de::DeserializeOwned;
 
 use crate::utils::errors::McResult;
@@ -215,6 +216,21 @@ pub fn quoted_property(key: &str, value: &str) -> KdlEntry {
     entry.set_format(KdlEntryFormat {
         leading: String::from(" "),
         value_repr: quote(value),
+        ..KdlEntryFormat::default()
+    });
+
+    entry
+}
+
+/// A non-string property, rendered the way the crate prints the value.
+pub fn property(key: &str, value: impl Into<KdlValue>) -> KdlEntry {
+    let value = value.into();
+    let value_repr = value.to_string();
+    let mut entry = KdlEntry::new_prop(key, value);
+
+    entry.set_format(KdlEntryFormat {
+        leading: String::from(" "),
+        value_repr,
         ..KdlEntryFormat::default()
     });
 

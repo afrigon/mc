@@ -10,6 +10,7 @@ use crate::manifest::Manifest;
 use crate::manifest::ManifestBan;
 use crate::manifest::ManifestMod;
 use crate::manifest::ManifestOp;
+use crate::manifest::PlayerGroup;
 use crate::manifest::document;
 use crate::manifest::lock::Lockfile;
 use crate::manifest::lock::ModLockfileEntry;
@@ -21,6 +22,7 @@ use crate::minecraft::MinecraftLevelKind;
 use crate::minecraft::MinecraftPermission;
 use crate::minecraft::seed::MinecraftSeed;
 use crate::ops::backups::BackupStorage;
+use crate::utils;
 use crate::utils::errors::McResult;
 
 const FULL: &str = r#"
@@ -754,6 +756,82 @@ fn remove_mod_without_block_is_a_noop() -> McResult<()> {
 
     assert!(!document::remove_mod(&mut document, "a"));
     assert_eq!(document.to_string(), "name \"x\"\n");
+
+    Ok(())
+}
+
+#[test]
+fn set_player_creates_the_blocks_with_blank_lines_between_groups() -> McResult<()> {
+    let mut document: KdlDocument = "name \"x\"\n".parse()?;
+
+    document::set_player(&mut document, PlayerGroup::Allow, "Notch", Vec::new())?;
+    document::set_player(&mut document, PlayerGroup::Allow, "123abc", Vec::new())?;
+    document::set_player(
+        &mut document,
+        PlayerGroup::Op,
+        "Notch",
+        vec![
+            utils::kdl::property("level", 3),
+            utils::kdl::property("bypasses-player-limit", true),
+        ]
+    )?;
+
+    assert_eq!(
+        document.to_string(),
+        "name \"x\"\n\nplayers {\n    allow {\n        Notch\n        \"123abc\"\n    }\n\n    op {\n        Notch level=3 bypasses-player-limit=#true\n    }\n}\n"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn set_player_replaces_properties_in_place() -> McResult<()> {
+    let source =
+        "players {\n  ban {\n    // keep me\n    Griefer reason=\"old\" // trailing\n  }\n}\n";
+    let mut document: KdlDocument = source.parse()?;
+
+    document::set_player(
+        &mut document,
+        PlayerGroup::Ban,
+        "Griefer",
+        vec![utils::kdl::quoted_property("reason", "new")]
+    )?;
+
+    assert_eq!(
+        document.to_string(),
+        "players {\n  ban {\n    // keep me\n    Griefer reason=\"new\" // trailing\n  }\n}\n"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn remove_player_keeps_the_block_shape() -> McResult<()> {
+    let source = "players {\n    allow {\n        Notch\n        jeb_\n    }\n}\n";
+    let mut document: KdlDocument = source.parse()?;
+
+    assert!(document::remove_player(
+        &mut document,
+        PlayerGroup::Allow,
+        "Notch"
+    ));
+    assert_eq!(
+        document.to_string(),
+        "players {\n    allow {\n        jeb_\n    }\n}\n"
+    );
+
+    assert!(document::remove_player(
+        &mut document,
+        PlayerGroup::Allow,
+        "jeb_"
+    ));
+    assert_eq!(document.to_string(), "players {\n    allow {\n    }\n}\n");
+
+    assert!(!document::remove_player(
+        &mut document,
+        PlayerGroup::Ban,
+        "jeb_"
+    ));
 
     Ok(())
 }

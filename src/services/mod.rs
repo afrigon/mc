@@ -6,6 +6,7 @@ pub mod graal_api;
 pub mod java_provider;
 pub mod minecraft_api;
 pub mod modrinth_api;
+pub mod mojang_api;
 pub mod playit_api;
 pub mod s3_api;
 pub mod tunnel_provider;
