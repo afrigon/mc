@@ -36,6 +36,7 @@ server {
     difficulty "hard"
     level-type "minecraft:flat"
     hardcore #true
+    allow-list #false
     seed -1412583731547517931
     ip "0.0.0.0"
     port 25566
@@ -49,7 +50,6 @@ server {
     eula #true
 
     properties {
-        white-list #false
         spawn-protection 16
         "query.port" 25565
         rcon {
@@ -128,6 +128,7 @@ fn full_manifest_decodes() -> McResult<()> {
         MinecraftLevelKind::Flat
     ));
     assert!(manifest.server.hardcore);
+    assert!(!manifest.server.allow_list);
     assert_eq!(
         manifest.server.seed,
         Some(MinecraftSeed::Numeric(-1412583731547517931))
@@ -142,10 +143,6 @@ fn full_manifest_decodes() -> McResult<()> {
 
     let properties = manifest.server.property_overrides()?;
     assert_eq!(
-        properties.get("white-list").map(String::as_str),
-        Some("false")
-    );
-    assert_eq!(
         properties.get("spawn-protection").map(String::as_str),
         Some("16")
     );
@@ -157,7 +154,7 @@ fn full_manifest_decodes() -> McResult<()> {
         properties.get("rcon.broadcast").map(String::as_str),
         Some("yes")
     );
-    assert_eq!(properties.len(), 4);
+    assert_eq!(properties.len(), 3);
 
     assert_eq!(manifest.mods.len(), 3);
     assert!(matches!(
@@ -212,6 +209,7 @@ fn minimal_manifest_uses_defaults() -> McResult<()> {
         MinecraftDifficulty::Normal
     ));
     assert!(!manifest.server.eula);
+    assert!(manifest.server.allow_list);
     assert_eq!(manifest.server.port, 25565);
     assert!(manifest.server.property_overrides()?.is_empty());
     assert!(manifest.mods.is_empty());
@@ -401,6 +399,39 @@ fn out_of_range_port_is_rejected_with_position() {
 
     assert!(message.contains("line 4, column 10"), "{message}");
     assert!(message.contains("expected u16"), "{message}");
+}
+
+#[test]
+fn white_list_property_is_rejected() {
+    let source = with_section("server {\n    properties {\n        white-list #false\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the `white-list` entry in `properties` is managed by mc; set `allow-list` in `server` instead"),
+        "{message}"
+    );
+}
+
+#[test]
+fn managed_property_is_rejected() {
+    let source = with_section("server {\n    properties {\n        server-port 25566\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the `server-port` entry in `properties` is managed by mc; set `port` in `server` instead"),
+        "{message}"
+    );
+}
+
+#[test]
+fn enable_rcon_property_is_rejected() {
+    let source = with_section("server {\n    properties {\n        enable-rcon #true\n    }\n}");
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the `enable-rcon` entry in `properties` is managed by mc; rcon is enabled when a rcon password is configured"),
+        "{message}"
+    );
 }
 
 #[test]
@@ -627,6 +658,7 @@ fn preset_base_document_is_a_valid_manifest() -> McResult<()> {
          \x20   gamemode \"survival\"\n\
          \x20   difficulty \"normal\"\n\
          \x20   hardcore #false\n\
+         \x20   allow-list #true\n\
          \n\
          \x20   // Setting this to true indicates YOU have read and agree to the Minecraft EULA (https://aka.ms/MinecraftEULA).\n\
          \x20   // This agreement is between you and Mojang/Microsoft.\n\

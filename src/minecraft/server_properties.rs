@@ -179,6 +179,30 @@ impl Default for ServerProperties {
     }
 }
 
+pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 15] = [
+    ("difficulty", "set `difficulty` in `server` instead"),
+    (
+        "enable-rcon",
+        "rcon is enabled when a rcon password is configured"
+    ),
+    ("gamemode", "set `gamemode` in `server` instead"),
+    ("hardcore", "set `hardcore` in `server` instead"),
+    ("level-name", "set `name` at the top level instead"),
+    ("level-seed", "set `seed` in `server` instead"),
+    ("level-type", "set `level-type` in `server` instead"),
+    ("max-players", "set `capacity` in `server` instead"),
+    ("motd", "set `description` at the top level instead"),
+    ("rcon.port", "set `rcon-port` in `server` instead"),
+    ("server-ip", "set `ip` in `server` instead"),
+    ("server-port", "set `port` in `server` instead"),
+    (
+        "simulation-distance",
+        "set `simulation-distance` in `server` instead"
+    ),
+    ("view-distance", "set `view-distance` in `server` instead"),
+    ("white-list", "set `allow-list` in `server` instead")
+];
+
 // The subset of server.properties driven by `mc.kdl` and the environment.
 // Serializing it yields the managed keys.
 #[derive(Serialize)]
@@ -207,7 +231,8 @@ pub struct ManagedServerProperties {
 
     pub server_port: u16,
     pub simulation_distance: u8,
-    pub view_distance: u8
+    pub view_distance: u8,
+    pub white_list: bool
 }
 
 impl ManagedServerProperties {
@@ -229,7 +254,8 @@ impl ManagedServerProperties {
             server_ip: manifest.server.ip.clone(),
             server_port: manifest.server.port,
             simulation_distance: manifest.server.simulation_distance,
-            view_distance: manifest.server.view_distance
+            view_distance: manifest.server.view_distance,
+            white_list: manifest.server.allow_list
         }
     }
 

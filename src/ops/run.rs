@@ -215,18 +215,11 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let property_overrides = manifest.server.property_overrides()?;
 
-    for key in property_overrides.keys() {
-        if managed_entries.contains_key(key) {
-            _ = context.shell().warn(format!(
-                "the `{}` entry in the `properties` block of `server` conflicts with a value managed through the manifest and was ignored",
-                key
-            ));
-        }
-    }
-
-    if property_overrides.contains_key("enable-rcon") {
+    if managed_entries.contains_key("rcon.password")
+        && property_overrides.contains_key("rcon.password")
+    {
         _ = context.shell().warn(
-            "the `enable-rcon` entry in the `properties` block of `server` was ignored; rcon is enabled when a rcon password is configured"
+            "the `rcon.password` entry in the `properties` block of `server` was ignored; `MC_RCON_PASSWORD` takes precedence"
         );
     }
 

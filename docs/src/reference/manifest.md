@@ -23,10 +23,11 @@ minecraft {
 server {
     gamemode "survival"
     difficulty "normal"
+    allow-list #true
     eula #true
 
     properties {
-        white-list #false
+        spawn-protection 16
     }
 }
 
@@ -127,6 +128,8 @@ through `properties`.
   `"minecraft:single_biome_surface"`. Defaults to `"minecraft:normal"`.
   (`level-type`)
 - `hardcore` — defaults to `#false`. (`hardcore`)
+- `allow-list` — whether players must be on the allow list before they can
+  join. Defaults to `#true`. (`white-list`)
 - `seed` — the world seed, as an integer or a string. Random when omitted.
   (`level-seed`)
 - `eula` — indicates that YOU have read and agree to the
@@ -152,8 +155,8 @@ block is the way to reach settings that have no `server` field:
 ```kdl
 server {
     properties {
-        white-list #false
         spawn-protection 16
+        enforce-whitelist #false
         "query.port" 25565
     }
 }
@@ -163,15 +166,14 @@ Values may be strings, integers, floats, or booleans. Keys containing a dot
 must be quoted, as above; a nested block spells the same key, so
 `rcon { broadcast "yes" }` sets `rcon.broadcast`.
 
-Keys managed by mc take precedence: an entry that conflicts with a value
-derived from the manifest or the environment is ignored with a warning.
-`enable-rcon` is always ignored — RCON is enabled exactly when an RCON
-password is configured (see
+Keys managed by mc are rejected: an entry for a key that a `server` field
+or the top-level `name` and `description` already drive is an error naming
+the field to use instead. `enable-rcon` is rejected too — RCON is enabled
+exactly when an RCON password is configured (see
 [Environment Variables](./environment-variables.md)).
 
-Note two defaults that differ from a vanilla server: the allow list is
-enabled (`white-list`), and the server binds all addresses, IPv6 included
-(`server-ip`).
+Note one default that differs from a vanilla server: mc binds all
+addresses, IPv6 included (`server-ip`).
 
 ## `mods`
 
