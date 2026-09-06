@@ -10,3 +10,4 @@ pub mod players;
 pub mod run;
 pub mod server_state;
 pub mod tunnel;
+pub mod workspace;

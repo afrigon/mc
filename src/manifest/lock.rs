@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::io::ErrorKind;
+use std::path::Path;
 
 use anyhow::Context;
 use kdl::KdlDocument;
@@ -17,6 +19,21 @@ pub struct Lockfile {
 }
 
 impl Lockfile {
+    /// A missing lockfile is an empty one.
+    pub async fn read(path: &Path) -> McResult<Lockfile> {
+        match tokio::fs::read_to_string(path).await {
+            Ok(source) => Lockfile::from_kdl_str(&source).context("could not parse mc.lock"),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Lockfile::default()),
+            Err(error) => Err(error).context("could not read mc.lock")
+        }
+    }
+
+    pub async fn write(&self, path: &Path) -> McResult<()> {
+        tokio::fs::write(path, self.to_kdl_document().to_string())
+            .await
+            .context("could not write mc.lock")
+    }
+
     pub fn from_kdl_str(source: &str) -> McResult<Lockfile> {
         let raw: RawLockfile = utils::kdl::deserialize(source)?;
         let mut mods = Vec::new();

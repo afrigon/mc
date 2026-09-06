@@ -1,7 +1,6 @@
 use std::env;
 use std::io::ErrorKind;
 use std::io::IsTerminal;
-use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::process::Stdio;
 use std::sync::PoisonError;
@@ -17,6 +16,7 @@ use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
+use crate::manifest::ManifestPaths;
 use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ManagedServerProperties;
 use crate::minecraft::server_properties::ServerProperties;
@@ -58,8 +58,7 @@ fn skip_echoed_signal() {
 }
 
 pub struct RunOptions {
-    pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf,
+    pub paths: ManifestPaths,
     pub server_logs: bool,
     pub tunnel_logs: bool
 }
@@ -88,7 +87,7 @@ fn has_jvm_property(arguments: &[String], property: &str) -> bool {
 /// Returns the server's exit status when it exits on its own; `None` when the
 /// shutdown was requested by a signal.
 pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Option<ExitStatus>> {
-    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
+    let manifest_string = tokio::fs::read_to_string(&options.paths.manifest_path)
         .await
         .context("could not find mc.kdl file")?;
     let manifest = Manifest::from_kdl_str(&manifest_string)?;
@@ -245,7 +244,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     let sync_options = SyncModsOptions {
         game_version: minecraft_version.clone(),
         loader: minecraft_loader.clone(),
-        lockfile_path: options.lockfile_path.clone(),
+        lockfile_path: options.paths.lockfile_path.clone(),
         mods_path: instance_path.join("mods"),
         staging_path: staging_path.clone()
     };
@@ -256,7 +255,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let apply_players_options = ApplyPlayersOptions {
         instance_path: instance_path.clone(),
-        lockfile_path: options.lockfile_path.clone(),
+        lockfile_path: options.paths.lockfile_path.clone(),
         online_mode: manifest.server.online_mode(),
         server_level: manifest.server.op_permission_level()
     };

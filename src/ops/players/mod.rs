@@ -4,12 +4,10 @@ pub mod op;
 
 use std::path::PathBuf;
 
-use anyhow::Context;
 use chrono::Utc;
-use kdl::KdlDocument;
 
 use crate::context::McContext;
-use crate::manifest::Manifest;
+use crate::manifest::ManifestPaths;
 use crate::manifest::ManifestPlayers;
 use crate::manifest::lock::Lockfile;
 use crate::minecraft::MinecraftPermission;
@@ -20,53 +18,7 @@ use crate::minecraft::players::BanEntry;
 use crate::minecraft::players::IpBanEntry;
 use crate::minecraft::players::OpEntry;
 use crate::resolvers;
-use crate::utils;
 use crate::utils::errors::McResult;
-
-pub struct PlayerPaths {
-    pub manifest_path: PathBuf,
-    pub lockfile_path: PathBuf
-}
-
-pub(super) struct Workspace {
-    pub(super) manifest: Manifest,
-    pub(super) document: KdlDocument,
-    pub(super) lockfile: Lockfile
-}
-
-pub(super) async fn load(paths: &PlayerPaths) -> McResult<Workspace> {
-    let manifest_string = tokio::fs::read_to_string(&paths.manifest_path)
-        .await
-        .context("could not find mc.kdl file")?;
-    let manifest = Manifest::from_kdl_str(&manifest_string)?;
-    let document = utils::kdl::parse_document(&manifest_string)?;
-    let lockfile = read_lockfile(&paths.lockfile_path).await?;
-
-    Ok(Workspace {
-        manifest,
-        document,
-        lockfile
-    })
-}
-
-pub(super) async fn save(paths: &PlayerPaths, workspace: &Workspace) -> McResult<()> {
-    tokio::fs::write(&paths.manifest_path, workspace.document.to_string()).await?;
-    write_lockfile(&paths.lockfile_path, &workspace.lockfile).await
-}
-
-pub(super) async fn read_lockfile(path: &PathBuf) -> McResult<Lockfile> {
-    match tokio::fs::read_to_string(path).await {
-        Ok(source) => Lockfile::from_kdl_str(&source).context("could not parse mc.lock"),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Lockfile::default()),
-        Err(error) => Err(error).context("could not read mc.lock")
-    }
-}
-
-pub(super) async fn write_lockfile(path: &PathBuf, lockfile: &Lockfile) -> McResult<()> {
-    tokio::fs::write(path, lockfile.to_kdl_document().to_string())
-        .await
-        .context("could not write mc.lock")
-}
 
 /// Names are unique regardless of case, so a lookup matches whatever casing
 /// the manifest holds.
@@ -80,7 +32,7 @@ pub(super) fn find_name<'a>(
 }
 
 pub struct PlayerListOptions {
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub struct ApplyPlayersOptions {
@@ -97,7 +49,7 @@ pub async fn apply(
     options: &ApplyPlayersOptions,
     players: &ManifestPlayers
 ) -> McResult<()> {
-    let mut lockfile = read_lockfile(&options.lockfile_path).await?;
+    let mut lockfile = Lockfile::read(&options.lockfile_path).await?;
     let locked_before = lockfile.players.clone();
     let now = Utc::now();
 
@@ -156,7 +108,7 @@ pub async fn apply(
     }
 
     if lockfile.players != locked_before {
-        write_lockfile(&options.lockfile_path, &lockfile).await?;
+        lockfile.write(&options.lockfile_path).await?;
     }
 
     let instance_path = &options.instance_path;

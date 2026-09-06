@@ -1,13 +1,12 @@
 use crate::context::McContext;
 use crate::manifest::Manifest;
+use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::find_name;
-use crate::ops::players::load;
-use crate::ops::players::save;
 use crate::ops::server_state::ServerState;
+use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils::errors::McResult;
 
@@ -21,11 +20,11 @@ fn warn_when_allow_list_is_off(context: &mut McContext, manifest: &Manifest) {
 
 pub struct AllowAddOptions {
     pub names: Vec<String>,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let online_mode = workspace.manifest.server.online_mode();
     let mut added = Vec::new();
 
@@ -61,7 +60,7 @@ pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult
         added.push(player.name);
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
 
@@ -80,11 +79,11 @@ pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult
 
 pub struct AllowRemoveOptions {
     pub names: Vec<String>,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn remove(context: &mut McContext, options: &AllowRemoveOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let mut removed = Vec::new();
 
     warn_when_allow_list_is_off(context, &workspace.manifest);
@@ -98,7 +97,7 @@ pub async fn remove(context: &mut McContext, options: &AllowRemoveOptions) -> Mc
         removed.push(existing);
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
 
@@ -116,7 +115,7 @@ pub async fn remove(context: &mut McContext, options: &AllowRemoveOptions) -> Mc
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = load(&options.paths).await?;
+    let workspace = Workspace::load(&options.paths).await?;
     let allow = &workspace.manifest.players.allow;
 
     if allow.is_empty() {

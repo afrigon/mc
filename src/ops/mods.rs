@@ -5,13 +5,12 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::Context;
-use kdl::KdlDocument;
 
 use crate::context::McContext;
 use crate::crypto::checksum::ChecksumRef;
 use crate::crypto::checksum::LocalChecksum;
-use crate::manifest::Manifest;
 use crate::manifest::ManifestMod;
+use crate::manifest::ManifestPaths;
 use crate::manifest::document;
 use crate::manifest::lock::Lockfile;
 use crate::manifest::lock::ModLockfileEntry;
@@ -20,6 +19,7 @@ use crate::mods::loader::LoaderKind;
 use crate::network;
 use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
+use crate::ops::workspace::Workspace;
 use crate::services;
 use crate::services::modrinth_api::ModrinthApiDependencyKind;
 use crate::utils::errors::McResult;
@@ -28,15 +28,13 @@ use crate::utils::product_descriptor::RawProductDescriptor;
 
 pub struct AddModsOptions {
     pub mods: Vec<String>,
-    pub manifest_path: PathBuf
+    pub paths: ManifestPaths
 }
 
 pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<()> {
-    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
-        .await
-        .context("could not find mc.kdl file")?;
-    let manifest = Manifest::from_kdl_str(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
+    let mut workspace = Workspace::load(&options.paths).await?;
+    let manifest = &workspace.manifest;
+    let manifest_document = &mut workspace.document;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -56,7 +54,7 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
                 format!("the mod `{}` could not be found on modrinth for the configured versions and loader", m)
             )?;
 
-            document::set_mod_version(&mut manifest_document, m, &version.id)?;
+            document::set_mod_version(manifest_document, m, &version.id)?;
 
             _ = context
                 .shell()
@@ -66,25 +64,23 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
         anyhow::bail!("a loader must be configured in mc.kdl before adding to mods");
     }
 
-    tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
+    workspace.save().await?;
 
     Ok(())
 }
 
 pub struct RemoveModsOptions {
     pub mods: Vec<String>,
-    pub manifest_path: PathBuf
+    pub paths: ManifestPaths
 }
 
 pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McResult<()> {
-    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
-        .await
-        .context("could not find mc.kdl file")?;
-    let manifest = Manifest::from_kdl_str(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
+    let mut workspace = Workspace::load(&options.paths).await?;
+    let manifest = &workspace.manifest;
+    let manifest_document = &mut workspace.document;
 
     for m in &options.mods {
-        if manifest.mods.contains_key(m) && document::remove_mod(&mut manifest_document, m) {
+        if manifest.mods.contains_key(m) && document::remove_mod(manifest_document, m) {
             _ = context
                 .shell()
                 .status("Removing", format!("{} from mods", m));
@@ -95,22 +91,20 @@ pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McR
         }
     }
 
-    tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
+    workspace.save().await?;
 
     Ok(())
 }
 
 pub struct UpdateModsOptions {
     pub mods: Vec<String>,
-    pub manifest_path: PathBuf
+    pub paths: ManifestPaths
 }
 
 pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McResult<()> {
-    let manifest_string = tokio::fs::read_to_string(&options.manifest_path)
-        .await
-        .context("could not find mc.kdl file")?;
-    let manifest = Manifest::from_kdl_str(&manifest_string)?;
-    let mut manifest_document = manifest_string.parse::<KdlDocument>()?;
+    let mut workspace = Workspace::load(&options.paths).await?;
+    let manifest = &workspace.manifest;
+    let manifest_document = &mut workspace.document;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -166,14 +160,14 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
                 continue;
             }
 
-            document::set_mod_version(&mut manifest_document, name, &latest.id)?;
+            document::set_mod_version(manifest_document, name, &latest.id)?;
 
             _ = context
                 .shell()
                 .status("Updating", format!("{} {} -> {}", name, current, latest.id));
         }
 
-        tokio::fs::write(&options.manifest_path, manifest_document.to_string()).await?;
+        workspace.save().await?;
     } else {
         anyhow::bail!("a loader must be configured in mc.kdl before updating mods");
     }

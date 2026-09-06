@@ -29,8 +29,7 @@ pub struct RunCommand {
 impl CommandHandler for RunCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = RunOptions {
-            manifest_path: self.manifest.manifest_path.clone(),
-            lockfile_path: self.lockfile.lockfile_path.clone(),
+            paths: self.manifest.with_lockfile(&self.lockfile),
             server_logs: self.server_logs,
             tunnel_logs: self.tunnel_logs
         };

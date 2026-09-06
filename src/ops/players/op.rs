@@ -1,13 +1,12 @@
 use crate::context::McContext;
+use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
 use crate::minecraft::MinecraftPermission;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::find_name;
-use crate::ops::players::load;
-use crate::ops::players::save;
 use crate::ops::server_state::ServerState;
+use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils;
 use crate::utils::errors::McResult;
@@ -16,11 +15,11 @@ pub struct OpAddOptions {
     pub names: Vec<String>,
     pub level: Option<MinecraftPermission>,
     pub bypasses_player_limit: bool,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let online_mode = workspace.manifest.server.online_mode();
     let server_level = workspace.manifest.server.op_permission_level();
     let live_applicable =
@@ -75,7 +74,7 @@ pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()
         )?;
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
 
@@ -104,11 +103,11 @@ pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()
 
 pub struct OpRemoveOptions {
     pub names: Vec<String>,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let mut removed = Vec::new();
 
     for name in &options.names {
@@ -125,7 +124,7 @@ pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McRes
         }
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
 
@@ -141,7 +140,7 @@ pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McRes
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = load(&options.paths).await?;
+    let workspace = Workspace::load(&options.paths).await?;
     let server_level = workspace.manifest.server.op_permission_level();
     let ops = &workspace.manifest.players.op;
 

@@ -11,7 +11,6 @@ use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::ops;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::ban::BanAddOptions;
 use crate::ops::players::ban::BanRemoveOptions;
 use crate::utils::errors::CliError;
@@ -83,10 +82,7 @@ impl CommandHandler for BanAddCommand {
             addresses: self.addresses.clone(),
             reason: self.reason.clone(),
             expires,
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::ban::add(context, &options).await?;
@@ -117,10 +113,7 @@ impl CommandHandler for BanRemoveCommand {
         let options = BanRemoveOptions {
             names: self.names.clone(),
             addresses: self.addresses.clone(),
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::ban::remove(context, &options).await?;
@@ -141,10 +134,7 @@ pub struct BanListCommand {
 impl CommandHandler for BanListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::ban::list(context, &options).await?;

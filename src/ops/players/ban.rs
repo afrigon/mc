@@ -6,14 +6,13 @@ use kdl::KdlEntry;
 
 use crate::context::McContext;
 use crate::manifest::ManifestBan;
+use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::find_name;
-use crate::ops::players::load;
-use crate::ops::players::save;
 use crate::ops::server_state::ServerState;
+use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils;
 use crate::utils::errors::McResult;
@@ -64,11 +63,11 @@ pub struct BanAddOptions {
     pub addresses: Vec<IpAddr>,
     pub reason: Option<String>,
     pub expires: Option<DateTime<Utc>>,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let online_mode = workspace.manifest.server.online_mode();
     let ban = ManifestBan {
         reason: options.reason.clone(),
@@ -117,7 +116,7 @@ pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<(
         )?;
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
     let reason = options
@@ -158,11 +157,11 @@ pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<(
 pub struct BanRemoveOptions {
     pub names: Vec<String>,
     pub addresses: Vec<IpAddr>,
-    pub paths: PlayerPaths
+    pub paths: ManifestPaths
 }
 
 pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McResult<()> {
-    let mut workspace = load(&options.paths).await?;
+    let mut workspace = Workspace::load(&options.paths).await?;
     let mut pardoned_names = Vec::new();
     let mut pardoned_addresses = Vec::new();
 
@@ -191,7 +190,7 @@ pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McRe
         }
     }
 
-    save(&options.paths, &workspace).await?;
+    workspace.save().await?;
 
     let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
 
@@ -213,7 +212,7 @@ pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McRe
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = load(&options.paths).await?;
+    let workspace = Workspace::load(&options.paths).await?;
     let players = &workspace.manifest.players;
 
     if players.ban.is_empty() && players.ban_ip.is_empty() {

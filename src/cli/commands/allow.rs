@@ -7,7 +7,6 @@ use crate::cli::args::ManifestArgs;
 use crate::context::McContext;
 use crate::ops;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::allow::AllowAddOptions;
 use crate::ops::players::allow::AllowRemoveOptions;
 use crate::utils::errors::CliResult;
@@ -48,10 +47,7 @@ impl CommandHandler for AllowAddCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = AllowAddOptions {
             names: self.names.clone(),
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::allow::add(context, &options).await?;
@@ -77,10 +73,7 @@ impl CommandHandler for AllowRemoveCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = AllowRemoveOptions {
             names: self.names.clone(),
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::allow::remove(context, &options).await?;
@@ -101,10 +94,7 @@ pub struct AllowListCommand {
 impl CommandHandler for AllowListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::allow::list(context, &options).await?;

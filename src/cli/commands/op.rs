@@ -8,7 +8,6 @@ use crate::context::McContext;
 use crate::minecraft::MinecraftPermission;
 use crate::ops;
 use crate::ops::players::PlayerListOptions;
-use crate::ops::players::PlayerPaths;
 use crate::ops::players::op::OpAddOptions;
 use crate::ops::players::op::OpRemoveOptions;
 use crate::utils::errors::CliError;
@@ -66,10 +65,7 @@ impl CommandHandler for OpAddCommand {
             names: self.names.clone(),
             level,
             bypasses_player_limit: self.bypass_player_limit,
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::op::add(context, &options).await?;
@@ -95,10 +91,7 @@ impl CommandHandler for OpRemoveCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = OpRemoveOptions {
             names: self.names.clone(),
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::op::remove(context, &options).await?;
@@ -119,10 +112,7 @@ pub struct OpListCommand {
 impl CommandHandler for OpListCommand {
     async fn handle(&self, context: &mut McContext) -> CliResult {
         let options = PlayerListOptions {
-            paths: PlayerPaths {
-                manifest_path: self.manifest.manifest_path.clone(),
-                lockfile_path: self.lockfile.lockfile_path.clone()
-            }
+            paths: self.manifest.with_lockfile(&self.lockfile)
         };
 
         ops::players::op::list(context, &options).await?;

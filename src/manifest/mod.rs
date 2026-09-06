@@ -58,6 +58,13 @@ use crate::utils::product_descriptor::ProductDescriptor;
 use crate::utils::product_descriptor::RawProductDescriptor;
 use crate::utils::product_descriptor::VersionResolver;
 
+/// Where an instance's manifest and lockfile live.
+#[derive(Clone)]
+pub struct ManifestPaths {
+    pub manifest_path: PathBuf,
+    pub lockfile_path: PathBuf
+}
+
 pub struct Manifest {
     pub name: String,
     pub description: String,
