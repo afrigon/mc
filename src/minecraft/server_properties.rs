@@ -17,13 +17,8 @@ use crate::utils;
 use crate::utils::csv::SeparatedList;
 use crate::utils::errors::McResult;
 
-// Mirrors the vanilla server.properties keys and defaults as of Minecraft Java
-// Edition 26.3, per https://minecraft.wiki/w/Server.properties, except the
-// fields commented inline in `Default`. To sync with a later Minecraft version:
-// read that page's History section for every key added, removed, or defaulted
-// differently after 26.3, mirror each change in both the struct fields
-// (alphabetical by serialized kebab-case name) and the `Default` impl below,
-// then bump the version in this comment.
+// Vanilla server.properties defaults as of Minecraft Java Edition 26.3, per
+// https://minecraft.wiki/w/Server.properties, except the fields commented inline.
 #[derive(Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ServerProperties {
