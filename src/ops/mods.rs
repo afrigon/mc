@@ -19,7 +19,7 @@ use crate::mods::loader::LoaderKind;
 use crate::network;
 use crate::network::artifact::ArtifactKind;
 use crate::network::artifact::ArtifactSource;
-use crate::ops::workspace::Workspace;
+use crate::ops::manifest_files::ManifestFiles;
 use crate::services;
 use crate::services::modrinth_api::ModrinthApiDependencyKind;
 use crate::utils::errors::McResult;
@@ -32,9 +32,9 @@ pub struct AddModsOptions {
 }
 
 pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let manifest = &workspace.manifest;
-    let manifest_document = &mut workspace.document;
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let manifest = &files.manifest;
+    let manifest_document = &mut files.document;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -64,7 +64,7 @@ pub async fn add(context: &mut McContext, options: &AddModsOptions) -> McResult<
         anyhow::bail!("a loader must be configured in mc.kdl before adding to mods");
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
     Ok(())
 }
@@ -75,9 +75,9 @@ pub struct RemoveModsOptions {
 }
 
 pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let manifest = &workspace.manifest;
-    let manifest_document = &mut workspace.document;
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let manifest = &files.manifest;
+    let manifest_document = &mut files.document;
 
     for m in &options.mods {
         if manifest.mods.contains_key(m) && document::remove_mod(manifest_document, m) {
@@ -91,7 +91,7 @@ pub async fn remove(context: &mut McContext, options: &RemoveModsOptions) -> McR
         }
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
     Ok(())
 }
@@ -102,9 +102,9 @@ pub struct UpdateModsOptions {
 }
 
 pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let manifest = &workspace.manifest;
-    let manifest_document = &mut workspace.document;
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let manifest = &files.manifest;
+    let manifest_document = &mut files.document;
 
     let minecraft_version = manifest.minecraft.resolved_version(context).await?;
     let minecraft_loader = manifest.minecraft.loader_descriptor(context).await?;
@@ -167,7 +167,7 @@ pub async fn update(context: &mut McContext, options: &UpdateModsOptions) -> McR
                 .status("Updating", format!("{} {} -> {}", name, current, latest.id));
         }
 
-        workspace.save().await?;
+        files.save().await?;
     } else {
         anyhow::bail!("a loader must be configured in mc.kdl before updating mods");
     }
@@ -201,7 +201,7 @@ pub async fn sync(
             .unwrap_or_default();
 
         for new in &mut new_lockfile {
-            for old in &old_lockfile.mods {
+            for old in old_lockfile.mods() {
                 if old.name == new.name && old.version == new.version {
                     new.hash = old.hash.clone();
 
@@ -306,10 +306,9 @@ pub async fn sync(
             tokio::fs::remove_file(options.mods_path.join(name).with_extension("jar")).await?;
         }
 
-        let lockfile = Lockfile {
-            mods: new_lockfile,
-            players: old_lockfile.players
-        };
+        let mut lockfile = old_lockfile;
+
+        lockfile.set_mods(new_lockfile);
         tokio::fs::write(
             &options.lockfile_path,
             lockfile.to_kdl_document().to_string()

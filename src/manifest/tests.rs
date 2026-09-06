@@ -674,8 +674,8 @@ fn slashdash_node_is_ignored() -> McResult<()> {
 
 #[test]
 fn lockfile_round_trips() -> McResult<()> {
-    let lockfile = Lockfile {
-        mods: vec![
+    let lockfile = Lockfile::new(
+        vec![
             ModLockfileEntry {
                 name: String::from("lithium"),
                 version: Some(String::from("UPNexAfy")),
@@ -689,11 +689,11 @@ fn lockfile_round_trips() -> McResult<()> {
                 hash: None
             },
         ],
-        players: BTreeMap::from([(
+        BTreeMap::from([(
             String::from("Notch"),
             Uuid::parse_str("069a79f4-44e9-4726-a5be-fca90e38aaf5")?
         )])
-    };
+    );
 
     let text = lockfile.to_kdl_document().to_string();
 
@@ -714,15 +714,18 @@ fn lockfile_round_trips() -> McResult<()> {
 
     let parsed = Lockfile::from_kdl_str(&text)?;
 
-    assert_eq!(parsed.mods.len(), 2);
-    assert_eq!(parsed.mods[0].name, "lithium");
-    assert_eq!(parsed.mods[0].version.as_deref(), Some("UPNexAfy"));
-    assert_eq!(parsed.mods[0].source, ModLockfileSource::Modrinth);
-    assert_eq!(parsed.mods[0].hash.as_deref(), Some("sha512:abc"));
-    assert_eq!(parsed.mods[1].name, "my-mod");
-    assert_eq!(parsed.mods[1].version, None);
-    assert_eq!(parsed.mods[1].source, lockfile.mods[1].source);
-    assert_eq!(parsed.players, lockfile.players);
+    let mods = parsed.mods();
+
+    assert_eq!(mods.len(), 2);
+    assert_eq!(mods[0].name, "lithium");
+    assert_eq!(mods[0].version.as_deref(), Some("UPNexAfy"));
+    assert_eq!(mods[0].source, ModLockfileSource::Modrinth);
+    assert_eq!(mods[0].hash.as_deref(), Some("sha512:abc"));
+    assert_eq!(mods[1].name, "my-mod");
+    assert_eq!(mods[1].version, None);
+    assert_eq!(mods[1].source, lockfile.mods()[1].source);
+    assert_eq!(parsed.players(), lockfile.players());
+    assert!(!parsed.changed());
 
     Ok(())
 }
@@ -732,7 +735,7 @@ fn empty_lockfile_round_trips() -> McResult<()> {
     let text = Lockfile::default().to_kdl_document().to_string();
 
     assert_eq!(text, "");
-    assert!(Lockfile::from_kdl_str(&text)?.mods.is_empty());
+    assert!(Lockfile::from_kdl_str(&text)?.mods().is_empty());
 
     Ok(())
 }
@@ -803,6 +806,19 @@ fn remove_mod_without_block_is_a_noop() -> McResult<()> {
     assert_eq!(document.to_string(), "name \"x\"\n");
 
     Ok(())
+}
+
+#[test]
+fn lockfile_tracks_changes() {
+    let mut lockfile = Lockfile::default();
+
+    assert!(!lockfile.changed());
+
+    lockfile.record_player(String::from("Notch"), Uuid::nil());
+
+    assert!(lockfile.changed());
+    assert_eq!(lockfile.player("notch"), Some(("Notch", Uuid::nil())));
+    assert_eq!(lockfile.player("jeb_"), None);
 }
 
 #[test]

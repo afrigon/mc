@@ -3,10 +3,10 @@ use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
 use crate::minecraft::MinecraftPermission;
+use crate::ops::manifest_files::ManifestFiles;
 use crate::ops::players::PlayerListOptions;
 use crate::ops::players::find_name;
 use crate::ops::server_state::ServerState;
-use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils;
 use crate::utils::errors::McResult;
@@ -19,9 +19,9 @@ pub struct OpAddOptions {
 }
 
 pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let online_mode = workspace.manifest.server.online_mode();
-    let server_level = workspace.manifest.server.op_permission_level();
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let online_mode = files.manifest.server.online_mode();
+    let server_level = files.manifest.server.op_permission_level();
     let live_applicable =
         options.level.is_none_or(|level| level == server_level) && !options.bypasses_player_limit;
 
@@ -39,7 +39,7 @@ pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()
     let mut updated_ops = Vec::new();
 
     for name in &options.names {
-        let existing = find_name(workspace.manifest.players.op.keys(), name).cloned();
+        let existing = find_name(files.manifest.players.op.keys(), name).cloned();
 
         let player_name = match existing {
             Some(existing) => {
@@ -52,13 +52,9 @@ pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()
                 existing
             }
             None => {
-                let player = resolvers::players::resolve(
-                    context,
-                    &mut workspace.lockfile,
-                    name,
-                    online_mode
-                )
-                .await?;
+                let player =
+                    resolvers::players::resolve(context, &mut files.lockfile, name, online_mode)
+                        .await?;
 
                 new_ops.push(player.name.clone());
 
@@ -67,16 +63,16 @@ pub async fn add(context: &mut McContext, options: &OpAddOptions) -> McResult<()
         };
 
         document::set_player(
-            &mut workspace.document,
+            &mut files.document,
             PlayerGroup::Op,
             &player_name,
             entries.clone()
         )?;
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
 
     for name in new_ops {
         _ = context.shell().status("Opping", &name);
@@ -107,13 +103,13 @@ pub struct OpRemoveOptions {
 }
 
 pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
+    let mut files = ManifestFiles::load(&options.paths).await?;
     let mut removed = Vec::new();
 
     for name in &options.names {
-        match find_name(workspace.manifest.players.op.keys(), name).cloned() {
+        match find_name(files.manifest.players.op.keys(), name).cloned() {
             Some(existing) => {
-                document::remove_player(&mut workspace.document, PlayerGroup::Op, &existing);
+                document::remove_player(&mut files.document, PlayerGroup::Op, &existing);
                 removed.push(existing);
             }
             None => {
@@ -124,9 +120,9 @@ pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McRes
         }
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
 
     for name in removed {
         _ = context.shell().status("Deopping", &name);
@@ -140,9 +136,9 @@ pub async fn remove(context: &mut McContext, options: &OpRemoveOptions) -> McRes
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = Workspace::load(&options.paths).await?;
-    let server_level = workspace.manifest.server.op_permission_level();
-    let ops = &workspace.manifest.players.op;
+    let files = ManifestFiles::load(&options.paths).await?;
+    let server_level = files.manifest.server.op_permission_level();
+    let ops = &files.manifest.players.op;
 
     if ops.is_empty() {
         _ = context.shell().status("Operators", "nobody");

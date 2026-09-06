@@ -35,15 +35,10 @@ async fn resolve_account(
     lockfile: &mut Lockfile,
     name: &str
 ) -> McResult<ResolvedPlayer> {
-    let locked = lockfile
-        .players
-        .iter()
-        .find(|(locked, _)| locked.eq_ignore_ascii_case(name));
-
-    if let Some((locked_name, uuid)) = locked {
+    if let Some((recorded, uuid)) = lockfile.player(name) {
         return Ok(ResolvedPlayer {
-            name: locked_name.clone(),
-            uuid: *uuid
+            name: recorded.to_owned(),
+            uuid
         });
     }
 
@@ -51,7 +46,7 @@ async fn resolve_account(
         .await?
         .ok_or_else(|| anyhow::anyhow!("no Minecraft account is named `{}`", name))?;
 
-    lockfile.players.insert(profile.name.clone(), profile.id);
+    lockfile.record_player(profile.name.clone(), profile.id);
 
     Ok(ResolvedPlayer {
         name: profile.name,

@@ -9,10 +9,10 @@ use crate::manifest::ManifestBan;
 use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
+use crate::ops::manifest_files::ManifestFiles;
 use crate::ops::players::PlayerListOptions;
 use crate::ops::players::find_name;
 use crate::ops::server_state::ServerState;
-use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils;
 use crate::utils::errors::McResult;
@@ -67,8 +67,8 @@ pub struct BanAddOptions {
 }
 
 pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let online_mode = workspace.manifest.server.online_mode();
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let online_mode = files.manifest.server.online_mode();
     let ban = ManifestBan {
         reason: options.reason.clone(),
         created: Some(Utc::now()),
@@ -78,24 +78,23 @@ pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<(
     let mut disallowed_names = Vec::new();
 
     for name in &options.names {
-        if let Some(existing) = find_name(workspace.manifest.players.ban.keys(), name) {
+        if let Some(existing) = find_name(files.manifest.players.ban.keys(), name) {
             anyhow::bail!("`{}` is already banned", existing);
         }
 
         let player =
-            resolvers::players::resolve(context, &mut workspace.lockfile, name, online_mode)
-                .await?;
+            resolvers::players::resolve(context, &mut files.lockfile, name, online_mode).await?;
 
-        if let Some(allowed) = find_name(&workspace.manifest.players.allow, name).cloned() {
+        if let Some(allowed) = find_name(&files.manifest.players.allow, name).cloned() {
             _ = context
                 .shell()
                 .warn(format!("`{}` was removed from the allow list", allowed));
-            document::remove_player(&mut workspace.document, PlayerGroup::Allow, &allowed);
+            document::remove_player(&mut files.document, PlayerGroup::Allow, &allowed);
             disallowed_names.push(allowed);
         }
 
         document::set_player(
-            &mut workspace.document,
+            &mut files.document,
             PlayerGroup::Ban,
             &player.name,
             ban_entries(&ban)
@@ -104,21 +103,21 @@ pub async fn add(context: &mut McContext, options: &BanAddOptions) -> McResult<(
     }
 
     for address in &options.addresses {
-        if workspace.manifest.players.ban_ip.contains_key(address) {
+        if files.manifest.players.ban_ip.contains_key(address) {
             anyhow::bail!("`{}` is already banned", address);
         }
 
         document::set_player(
-            &mut workspace.document,
+            &mut files.document,
             PlayerGroup::BanIp,
             &address.to_string(),
             ban_entries(&ban)
         )?;
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
     let reason = options
         .reason
         .as_ref()
@@ -161,14 +160,14 @@ pub struct BanRemoveOptions {
 }
 
 pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
+    let mut files = ManifestFiles::load(&options.paths).await?;
     let mut pardoned_names = Vec::new();
     let mut pardoned_addresses = Vec::new();
 
     for name in &options.names {
-        match find_name(workspace.manifest.players.ban.keys(), name).cloned() {
+        match find_name(files.manifest.players.ban.keys(), name).cloned() {
             Some(existing) => {
-                document::remove_player(&mut workspace.document, PlayerGroup::Ban, &existing);
+                document::remove_player(&mut files.document, PlayerGroup::Ban, &existing);
                 pardoned_names.push(existing);
             }
             None => {
@@ -178,9 +177,9 @@ pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McRe
     }
 
     for address in &options.addresses {
-        if workspace.manifest.players.ban_ip.contains_key(address) {
+        if files.manifest.players.ban_ip.contains_key(address) {
             document::remove_player(
-                &mut workspace.document,
+                &mut files.document,
                 PlayerGroup::BanIp,
                 &address.to_string()
             );
@@ -190,9 +189,9 @@ pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McRe
         }
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
 
     for name in pardoned_names {
         _ = context.shell().status("Unbanning", &name);
@@ -212,8 +211,8 @@ pub async fn remove(context: &mut McContext, options: &BanRemoveOptions) -> McRe
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = Workspace::load(&options.paths).await?;
-    let players = &workspace.manifest.players;
+    let files = ManifestFiles::load(&options.paths).await?;
+    let players = &files.manifest.players;
 
     if players.ban.is_empty() && players.ban_ip.is_empty() {
         _ = context.shell().status("Banned", "nobody");

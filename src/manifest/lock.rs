@@ -14,11 +14,52 @@ use crate::utils::product_descriptor::RawProductDescriptor;
 
 #[derive(Debug, Default)]
 pub struct Lockfile {
-    pub mods: Vec<ModLockfileEntry>,
-    pub players: BTreeMap<String, Uuid>
+    mods: Vec<ModLockfileEntry>,
+    players: BTreeMap<String, Uuid>,
+    changed: bool
 }
 
 impl Lockfile {
+    pub fn new(mods: Vec<ModLockfileEntry>, players: BTreeMap<String, Uuid>) -> Lockfile {
+        Lockfile {
+            mods,
+            players,
+            changed: false
+        }
+    }
+
+    pub fn mods(&self) -> &[ModLockfileEntry] {
+        &self.mods
+    }
+
+    pub fn set_mods(&mut self, mods: Vec<ModLockfileEntry>) {
+        self.mods = mods;
+        self.changed = true;
+    }
+
+    pub fn players(&self) -> &BTreeMap<String, Uuid> {
+        &self.players
+    }
+
+    /// Names are unique regardless of case, so a lookup matches whatever
+    /// casing was recorded.
+    pub fn player(&self, name: &str) -> Option<(&str, Uuid)> {
+        self.players
+            .iter()
+            .find(|(recorded, _)| recorded.eq_ignore_ascii_case(name))
+            .map(|(recorded, uuid)| (recorded.as_str(), *uuid))
+    }
+
+    pub fn record_player(&mut self, name: String, uuid: Uuid) {
+        self.players.insert(name, uuid);
+        self.changed = true;
+    }
+
+    /// Whether anything was recorded since the lockfile was read or built.
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+
     /// A missing lockfile is an empty one.
     pub async fn read(path: &Path) -> McResult<Lockfile> {
         match tokio::fs::read_to_string(path).await {
@@ -72,7 +113,7 @@ impl Lockfile {
             players.insert(name, uuid);
         }
 
-        Ok(Lockfile { mods, players })
+        Ok(Lockfile::new(mods, players))
     }
 
     pub fn to_kdl_document(&self) -> KdlDocument {

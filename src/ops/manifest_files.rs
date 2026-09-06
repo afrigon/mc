@@ -10,30 +10,27 @@ use crate::utils::errors::McResult;
 /// An instance's manifest and lockfile, loaded together for a command that
 /// edits them: the resolved manifest to read from, its document to edit
 /// while preserving formatting, and the lockfile.
-pub struct Workspace {
+pub struct ManifestFiles {
     pub paths: ManifestPaths,
     pub manifest: Manifest,
     pub document: KdlDocument,
-    pub lockfile: Lockfile,
-    lockfile_source: String
+    pub lockfile: Lockfile
 }
 
-impl Workspace {
-    pub async fn load(paths: &ManifestPaths) -> McResult<Workspace> {
+impl ManifestFiles {
+    pub async fn load(paths: &ManifestPaths) -> McResult<ManifestFiles> {
         let manifest_string = tokio::fs::read_to_string(&paths.manifest_path)
             .await
             .context("could not find mc.kdl file")?;
         let manifest = Manifest::from_kdl_str(&manifest_string)?;
         let document = utils::kdl::parse_document(&manifest_string)?;
         let lockfile = Lockfile::read(&paths.lockfile_path).await?;
-        let lockfile_source = lockfile.to_kdl_document().to_string();
 
-        Ok(Workspace {
+        Ok(ManifestFiles {
             paths: paths.clone(),
             manifest,
             document,
-            lockfile,
-            lockfile_source
+            lockfile
         })
     }
 
@@ -44,7 +41,7 @@ impl Workspace {
             .await
             .context("could not write mc.kdl")?;
 
-        if self.lockfile.to_kdl_document().to_string() != self.lockfile_source {
+        if self.lockfile.changed() {
             self.lockfile.write(&self.paths.lockfile_path).await?;
         }
 

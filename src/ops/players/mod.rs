@@ -50,7 +50,6 @@ pub async fn apply(
     players: &ManifestPlayers
 ) -> McResult<()> {
     let mut lockfile = Lockfile::read(&options.lockfile_path).await?;
-    let locked_before = lockfile.players.clone();
     let now = Utc::now();
 
     let mut allow = Vec::new();
@@ -107,7 +106,7 @@ pub async fn apply(
         });
     }
 
-    if lockfile.players != locked_before {
+    if lockfile.changed() {
         lockfile.write(&options.lockfile_path).await?;
     }
 

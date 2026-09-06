@@ -3,10 +3,10 @@ use crate::manifest::Manifest;
 use crate::manifest::ManifestPaths;
 use crate::manifest::PlayerGroup;
 use crate::manifest::document;
+use crate::ops::manifest_files::ManifestFiles;
 use crate::ops::players::PlayerListOptions;
 use crate::ops::players::find_name;
 use crate::ops::server_state::ServerState;
-use crate::ops::workspace::Workspace;
 use crate::resolvers;
 use crate::utils::errors::McResult;
 
@@ -24,14 +24,14 @@ pub struct AllowAddOptions {
 }
 
 pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
-    let online_mode = workspace.manifest.server.online_mode();
+    let mut files = ManifestFiles::load(&options.paths).await?;
+    let online_mode = files.manifest.server.online_mode();
     let mut added = Vec::new();
 
-    warn_when_allow_list_is_off(context, &workspace.manifest);
+    warn_when_allow_list_is_off(context, &files.manifest);
 
     for name in &options.names {
-        if let Some(existing) = find_name(&workspace.manifest.players.allow, name) {
+        if let Some(existing) = find_name(&files.manifest.players.allow, name) {
             _ = context
                 .shell()
                 .warn(format!("`{}` is already allowed", existing));
@@ -39,7 +39,7 @@ pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult
             continue;
         }
 
-        if let Some(banned) = find_name(workspace.manifest.players.ban.keys(), name) {
+        if let Some(banned) = find_name(files.manifest.players.ban.keys(), name) {
             anyhow::bail!(
                 "`{}` is banned; run `mc ban remove {}` before allowing them",
                 banned,
@@ -48,11 +48,10 @@ pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult
         }
 
         let player =
-            resolvers::players::resolve(context, &mut workspace.lockfile, name, online_mode)
-                .await?;
+            resolvers::players::resolve(context, &mut files.lockfile, name, online_mode).await?;
 
         document::set_player(
-            &mut workspace.document,
+            &mut files.document,
             PlayerGroup::Allow,
             &player.name,
             Vec::new()
@@ -60,9 +59,9 @@ pub async fn add(context: &mut McContext, options: &AllowAddOptions) -> McResult
         added.push(player.name);
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
 
     for name in added {
         _ = context
@@ -83,23 +82,23 @@ pub struct AllowRemoveOptions {
 }
 
 pub async fn remove(context: &mut McContext, options: &AllowRemoveOptions) -> McResult<()> {
-    let mut workspace = Workspace::load(&options.paths).await?;
+    let mut files = ManifestFiles::load(&options.paths).await?;
     let mut removed = Vec::new();
 
-    warn_when_allow_list_is_off(context, &workspace.manifest);
+    warn_when_allow_list_is_off(context, &files.manifest);
 
     for name in &options.names {
-        let existing = find_name(&workspace.manifest.players.allow, name)
+        let existing = find_name(&files.manifest.players.allow, name)
             .ok_or_else(|| anyhow::anyhow!("`{}` is not allowed", name))?
             .clone();
 
-        document::remove_player(&mut workspace.document, PlayerGroup::Allow, &existing);
+        document::remove_player(&mut files.document, PlayerGroup::Allow, &existing);
         removed.push(existing);
     }
 
-    workspace.save().await?;
+    files.save().await?;
 
-    let mut live = ServerState::detect(context, workspace.manifest.server.rcon_port).await?;
+    let mut live = ServerState::detect(context, files.manifest.server.rcon_port).await?;
 
     for name in removed {
         _ = context
@@ -115,8 +114,8 @@ pub async fn remove(context: &mut McContext, options: &AllowRemoveOptions) -> Mc
 }
 
 pub async fn list(context: &mut McContext, options: &PlayerListOptions) -> McResult<()> {
-    let workspace = Workspace::load(&options.paths).await?;
-    let allow = &workspace.manifest.players.allow;
+    let files = ManifestFiles::load(&options.paths).await?;
+    let allow = &files.manifest.players.allow;
 
     if allow.is_empty() {
         _ = context.shell().status("Allowed", "nobody");
