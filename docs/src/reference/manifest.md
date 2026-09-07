@@ -196,7 +196,8 @@ must be quoted, as above; a nested block spells the same key, so
 
 Keys managed by mc are rejected: an entry for a key that a `server` field
 or the top-level `name` and `description` already drive is an error naming
-the field to use instead. `enable-rcon` is rejected too — RCON is enabled
+the field to use instead. Every managed entry is reported in the same
+error, so one pass fixes them all. `enable-rcon` is rejected too — RCON is enabled
 exactly when an RCON password is configured (see
 [Environment Variables](./environment-variables.md)).
 

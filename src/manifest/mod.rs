@@ -425,14 +425,19 @@ impl RawServer {
             flatten_properties(None, raw_properties, &mut properties)?;
         }
 
-        for (key, hint) in MANAGED_PROPERTY_KEYS {
-            if properties.contains_key(key) {
-                anyhow::bail!(
+        let managed: Vec<String> = MANAGED_PROPERTY_KEYS
+            .iter()
+            .filter(|(key, _)| properties.contains_key(*key))
+            .map(|(key, hint)| {
+                format!(
                     "the `{}` entry in `properties` is managed by mc; {}",
-                    key,
-                    hint
-                );
-            }
+                    key, hint
+                )
+            })
+            .collect();
+
+        if !managed.is_empty() {
+            anyhow::bail!("{}", managed.join("\n"));
         }
 
         Ok(ManifestServer {
