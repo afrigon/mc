@@ -194,6 +194,10 @@ Values may be strings, integers, floats, or booleans. Keys containing a dot
 must be quoted, as above; a nested block spells the same key, so
 `rcon { broadcast "yes" }` sets `rcon.broadcast`.
 
+Any key is accepted, since mods read their own settings from the same
+file, but [`mc run`](../commands/run.md) prints a warning for each key
+that is not a vanilla server property, so a typo does not go unnoticed.
+
 Keys managed by mc are rejected: an entry for a key that a `server` field
 or the top-level `name` and `description` already drive is an error naming
 the field to use instead. `enable-rcon` is rejected too — RCON is enabled

@@ -301,6 +301,27 @@ impl ServerProperties {
         Ok(password)
     }
 
+    // Mods read their own keys from server.properties, so an unknown key is a
+    // warning rather than an error.
+    pub fn unknown_keys(overrides: &BTreeMap<String, String>) -> McResult<Vec<String>> {
+        let s = serde_java_properties::to_string(&ServerProperties::default())
+            .context("could not serialize server.properties")?;
+
+        let known: BTreeMap<String, String> = serde_java_properties::from_str(&s)
+            .context("could not parse the generated server.properties")?;
+
+        Ok(overrides
+            .keys()
+            .filter(|key| {
+                !known.contains_key(*key)
+                    && !MANAGED_PROPERTY_KEYS
+                        .iter()
+                        .any(|(managed, _)| managed == key)
+            })
+            .cloned()
+            .collect())
+    }
+
     pub fn to_entries(
         &self,
         overrides: &BTreeMap<String, String>,

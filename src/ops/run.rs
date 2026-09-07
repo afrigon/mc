@@ -215,6 +215,13 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let property_overrides = manifest.server.property_overrides()?;
 
+    for key in ServerProperties::unknown_keys(&property_overrides)? {
+        _ = context.shell().warn(format!(
+            "the `{}` entry in `properties` is not a vanilla server property; it is written to server.properties as is",
+            key
+        ));
+    }
+
     let mut property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
 
     // rcon without a password would expose an unauthenticated console, so the
