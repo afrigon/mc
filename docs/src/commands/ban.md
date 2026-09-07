@@ -24,10 +24,10 @@ reported with a warning.
 Every player and address named in one command shares the same reason and
 expiry.
 
-```console
-$ mc ban add Griefer --reason "stole the beacon"
-$ mc ban add Griefer1 Griefer2 --for 7d
-$ mc ban add --ip 203.0.113.7 --ip 203.0.113.8 --until 2026-12-31T00:00:00Z
+```sh
+mc ban add Griefer --reason "stole the beacon"
+mc ban add Griefer1 Griefer2 --for 7d
+mc ban add --ip 203.0.113.7 --ip 203.0.113.8 --until 2026-12-31T00:00:00Z
 ```
 
 ### Options
@@ -51,9 +51,9 @@ mc ban remove [OPTIONS] --ip <ADDRESS>...
 Lifts bans on players, or with `--ip`, addresses. A player or address that
 is not banned is skipped with a warning.
 
-```console
-$ mc ban remove Griefer1 Griefer2
-$ mc ban remove --ip 203.0.113.7
+```sh
+mc ban remove Griefer1 Griefer2
+mc ban remove --ip 203.0.113.7
 ```
 
 ### Options

@@ -28,8 +28,8 @@ WantedBy=multi-user.target
 
 Then enable and start it:
 
-```console
-$ systemctl enable --now myserver
+```sh
+systemctl enable --now myserver
 ```
 
 `WorkingDirectory` must be the instance root — the directory containing
@@ -39,10 +39,9 @@ $ systemctl enable --now myserver
 
 Environment variables such as `MC_RCON_PASSWORD` or a notification webhook
 are best kept out of the unit file, in an `EnvironmentFile` readable only by
-root:
+root, such as `/etc/minecraft/myserver.env`:
 
-```console
-$ cat /etc/minecraft/myserver.env
+```text
 MC_RCON_PASSWORD=...
 MC_DISCORD_WEBHOOK=...
 ```
@@ -68,8 +67,8 @@ With `--server-logs`, the instance's console output goes to standard output,
 which systemd captures in the journal (add `--tunnel-logs` to capture the
 tunnel agent as well):
 
-```console
-$ journalctl -u myserver -f
+```sh
+journalctl -u myserver -f
 ```
 
 mc's own log verbosity is controlled by the global `--verbose` flag; the

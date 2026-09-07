@@ -14,6 +14,8 @@ Tools and tasks are defined in `mise.toml`: `mise run build`, `mise run test`, `
 
 The mdBook under `docs/` is the user-facing documentation. Every change to commands, the manifest format, environment variables, or user-visible runtime behavior must update the affected pages under `docs/src/` in the same change. The book documents behavior, not internals: keep prose generic (instance, Minecraft binary, mod loader, mod registry) and name concrete implementations (`fabric`, `modrinth`, `graal@25`) only where a reference page lists accepted values.
 
+Fenced code blocks in the book use exactly these languages: `kdl` for manifest and lockfile excerpts, `sh` for commands the reader types (no `$` prompt, one command per line), `ini` for systemd unit files, and `text` for everything else (command synopses, program output, directory trees, file contents). A command and its output never share a block: the output goes in a `text` block right after the `sh` block.
+
 ## Operational model
 
 - **One server per directory.** Each instance is a directory with `mc.kdl` at its root; the process CWD is always that root, and all cwd-relative paths in the code are correct by design (the scattered "fix this path / use a data path" TODOs are won't-fix under this model).

@@ -12,8 +12,11 @@ Lists the runtimes mc can install, as `vendor@version` descriptors. The one
 marked `(recommended)` is the default used when the manifest does not
 configure `version` under `java`.
 
-```console
-$ mc java list
+```sh
+mc java list
+```
+
+```text
 graal@25 (recommended)
 graal@21
 ...
@@ -41,7 +44,7 @@ command exists to provision one ahead of time.
 
 ### Examples
 
-```console
-$ mc java install graal@25
-$ mc java install corretto@21
+```sh
+mc java install graal@25
+mc java install corretto@21
 ```

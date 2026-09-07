@@ -42,7 +42,7 @@ run.
 
 ## Examples
 
-```console
-$ mc backup
-$ mc backup --name pre-update
+```sh
+mc backup
+mc backup --name pre-update
 ```

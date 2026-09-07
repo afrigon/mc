@@ -7,9 +7,9 @@ This walkthrough creates a new instance and runs it.
 Each instance lives in its own directory, with a `mc.kdl` manifest at its
 root. [`mc init`](./commands/init.md) creates both:
 
-```console
-$ mc init myserver
-$ cd myserver
+```sh
+mc init myserver
+cd myserver
 ```
 
 The generated manifest looks like this:
@@ -65,8 +65,8 @@ You can also pass `--eula` to `mc init` to do this at creation time.
 
 ## Run it
 
-```console
-$ mc run
+```sh
+mc run
 ```
 
 On first run, mc downloads a Java runtime, the Minecraft binary, the mod

@@ -34,8 +34,8 @@ not a fixed template.
 
 ## Examples
 
-```console
-$ mc init myserver
-$ mc init --preset technical --eula
-$ mc init myserver --name "smp" --preset vanilla
+```sh
+mc init myserver
+mc init --preset technical --eula
+mc init myserver --name "smp" --preset vanilla
 ```

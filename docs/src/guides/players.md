@@ -32,11 +32,11 @@ of the allow list.
 [`mc op`](../commands/op.md) edit the section for you. Each has `add`,
 `remove`, and `list` subcommands:
 
-```console
-$ mc allow add Notch jeb_
-$ mc ban add Griefer --reason "stole the beacon" --for 7d
-$ mc op add Notch
-$ mc op list
+```sh
+mc allow add Notch jeb_
+mc ban add Griefer --reason "stole the beacon" --for 7d
+mc op add Notch
+mc op list
 ```
 
 Names are looked up when added, so a typo fails at the command rather

@@ -29,9 +29,9 @@ the `modrinth` group for you. `mc add` looks the mod up on the registry and pins
 the latest version compatible with the configured Minecraft version and
 loader:
 
-```console
-$ mc add sodium lithium
-$ mc remove sodium
+```sh
+mc add sodium lithium
+mc remove sodium
 ```
 
 ## Updating mods
@@ -39,9 +39,9 @@ $ mc remove sodium
 [`mc update`](../commands/update.md) re-pins mods to the latest compatible
 version — every mod in the manifest, or only the ones you name:
 
-```console
-$ mc update
-$ mc update lithium
+```sh
+mc update
+mc update lithium
 ```
 
 Mods fetched from a direct URL have no version to compare and are skipped.

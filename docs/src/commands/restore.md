@@ -38,12 +38,18 @@ undoing again swaps back.
 
 ## Examples
 
-```console
-$ mc restore --list
+```sh
+mc restore --list
+```
+
+```text
 myserver_pre-update.tar.gz
 myserver_2026-07-15_15-00-00.tar.gz (latest)
 myserver_2026-07-14_15-00-00.tar.gz
-$ mc restore
-$ mc restore --backup myserver_pre-update.tar.gz
-$ mc restore --undo
+```
+
+```sh
+mc restore
+mc restore --backup myserver_pre-update.tar.gz
+mc restore --undo
 ```
