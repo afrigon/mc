@@ -82,7 +82,7 @@ mods {
 }
 
 backups {
-    on
+    enabled #true
     frequency "0 30 * * * *"
     keep 5
     s3 "my-bucket" region="us-east-1"
@@ -413,10 +413,10 @@ fn backups_flag_forms() -> McResult<()> {
         BackupStorage::Local { keep: 3, .. }
     ));
 
-    let on = Manifest::from_kdl_str(&with_section("backups {\n    on\n}"))?;
+    let on = Manifest::from_kdl_str(&with_section("backups {\n    enabled #true\n}"))?;
     assert!(on.backups.enabled);
 
-    let explicit = Manifest::from_kdl_str(&with_section("backups {\n    on #false\n}"))?;
+    let explicit = Manifest::from_kdl_str(&with_section("backups {\n    enabled #false\n}"))?;
     assert!(!explicit.backups.enabled);
 
     Ok(())
@@ -712,8 +712,9 @@ fn syntax_error_reports_position() {
 
 #[test]
 fn slashdash_node_is_ignored() -> McResult<()> {
-    let manifest =
-        Manifest::from_kdl_str(&with_section("backups {\n    /-local \"x\"\n    on\n}"))?;
+    let manifest = Manifest::from_kdl_str(&with_section(
+        "backups {\n    /-local \"x\"\n    enabled #true\n}"
+    ))?;
 
     assert!(manifest.backups.enabled);
     assert!(matches!(
@@ -976,7 +977,7 @@ fn preset_base_document_is_a_valid_manifest() -> McResult<()> {
          }\n\
          \n\
          backups {\n\
-         \x20   on\n\
+         \x20   enabled #true\n\
          \x20   frequency \"0 0 * * * *\"\n\
          }\n"
     );
