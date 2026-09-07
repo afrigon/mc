@@ -12,7 +12,14 @@ use crate::context::McContext;
 use crate::utils::errors::CliResult;
 
 #[derive(Parser)]
-#[command(version, about, name = "mc", styles = styles::styles(), color = ColorChoice::Auto)]
+#[command(
+    version,
+    about,
+    name = "mc",
+    after_help = "Documentation: https://afrigon.github.io/mc/",
+    styles = styles::styles(),
+    color = ColorChoice::Auto
+)]
 pub struct Cli {
     #[command(flatten)]
     pub globals: GlobalOptions,
