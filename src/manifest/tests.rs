@@ -598,6 +598,27 @@ fn managed_property_is_rejected() {
 }
 
 #[test]
+fn every_managed_property_is_reported_at_once() {
+    let source = with_section(
+        "server {\n    properties {\n        server-port 25566\n        white-list #false\n        enable-rcon #true\n    }\n}"
+    );
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the `server-port` entry in `properties` is managed by mc; set `port` in `server` instead"),
+        "{message}"
+    );
+    assert!(
+        message.contains("the `white-list` entry in `properties` is managed by mc; set `allow-list` in `server` instead"),
+        "{message}"
+    );
+    assert!(
+        message.contains("the `enable-rcon` entry in `properties` is managed by mc; rcon is enabled when a rcon password is configured"),
+        "{message}"
+    );
+}
+
+#[test]
 fn rcon_password_property_is_rejected() {
     let source =
         with_section("server {\n    properties {\n        \"rcon.password\" \"hunter2\"\n    }\n}");
