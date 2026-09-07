@@ -48,7 +48,7 @@ mods {
 }
 
 backups {
-    on
+    enabled #true
     frequency "0 0 * * * *"
     keep 20
     local "backups"
@@ -242,9 +242,10 @@ when the instance starts and recorded in the `mc.lock` lockfile — see
 
 Scheduled world backups, taken while the instance runs.
 
-- `on` — a bare flag: when present, backups run on the `frequency` schedule
-  while the instance runs. Comment it out or remove it to disable the
-  schedule. Manual [`mc backup`](../commands/backup.md) works regardless.
+- `enabled` — whether backups run on the `frequency` schedule while the
+  instance runs. Defaults to `#false`, so a manifest without this field, or
+  without a `backups` section at all, never schedules a backup. Manual
+  [`mc backup`](../commands/backup.md) works regardless.
 - `frequency` — a cron expression with six fields: seconds, minutes, hours,
   day of month, month, day of week. Defaults to `"0 0 * * * *"` (hourly).
 - `keep` — the number of most-recent automatic archives to keep in local
@@ -261,7 +262,7 @@ Write at most one of `local` and `s3`.
 
 ```kdl
 backups {
-    on
+    enabled #true
     frequency "0 0 * * * *"
     keep 20
     local "/mnt/data/mc"
@@ -270,7 +271,7 @@ backups {
 
 ```kdl
 backups {
-    on
+    enabled #true
     s3 "my-minecraft-backups" region="us-east-1"
 }
 ```
