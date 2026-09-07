@@ -26,8 +26,11 @@ Adding the section is enough — a bare `tunnel` node also works; see
 
 Start the instance from a terminal:
 
-```console
-$ mc run
+```sh
+mc run
+```
+
+```text
     Claiming tunnel agent, approve it at https://playit.gg/claim/... with your playit.gg account
      Claimed tunnel agent secret saved to .tunnel/playit.toml
     Creating a Minecraft tunnel for port 25565

@@ -18,7 +18,7 @@ The new versions are installed the next time the instance starts.
 
 ## Examples
 
-```console
-$ mc update
-$ mc update lithium carpet
+```sh
+mc update
+mc update lithium carpet
 ```

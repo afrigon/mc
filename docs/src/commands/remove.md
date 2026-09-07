@@ -18,6 +18,6 @@ lockfile and is uninstalled along with it.
 
 ## Examples
 
-```console
-$ mc remove carpet
+```sh
+mc remove carpet
 ```

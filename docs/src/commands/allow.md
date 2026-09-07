@@ -23,8 +23,8 @@ The list is still edited when `allow-list` in the `server` section is
 `#false`, but a warning points out that anyone can join until it is
 turned back on.
 
-```console
-$ mc allow add Notch jeb_
+```sh
+mc allow add Notch jeb_
 ```
 
 ### Options
@@ -41,8 +41,8 @@ mc allow remove [OPTIONS] <NAME>...
 Removes players from the allow list. Fails if a player is not on it. On a
 running instance, a removed player who is online is disconnected.
 
-```console
-$ mc allow remove Notch
+```sh
+mc allow remove Notch
 ```
 
 ### Options

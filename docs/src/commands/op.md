@@ -21,9 +21,9 @@ next restart, which is reported with a warning.
 
 Every player named in one command gets the same settings.
 
-```console
-$ mc op add Notch
-$ mc op add jeb_ Dinnerbone --level 2 --bypass-player-limit
+```sh
+mc op add Notch
+mc op add jeb_ Dinnerbone --level 2 --bypass-player-limit
 ```
 
 ### Options
@@ -44,8 +44,8 @@ mc op remove [OPTIONS] <NAME>...
 Removes operators. A player who is not an operator is skipped with a
 warning.
 
-```console
-$ mc op remove Notch
+```sh
+mc op remove Notch
 ```
 
 ### Options

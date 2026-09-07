@@ -58,7 +58,7 @@ command exists to provision one ahead of time.
 
 ### Examples
 
-```console
-$ mc minecraft install
-$ mc minecraft install --loader fabric
+```sh
+mc minecraft install
+mc minecraft install --loader fabric
 ```

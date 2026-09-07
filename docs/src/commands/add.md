@@ -22,7 +22,7 @@ any required dependencies — see [Managing Mods](../guides/mods.md).
 
 ## Examples
 
-```console
-$ mc add lithium
-$ mc add carpet servux
+```sh
+mc add lithium
+mc add carpet servux
 ```

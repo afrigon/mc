@@ -14,8 +14,11 @@ Lists the tunnel agent versions mc can install, most recent first. The one
 marked `(latest)` is what `provider` under `tunnel` resolves to when its version
 half is omitted or set to `latest`.
 
-```console
-$ mc tunnel list
+```sh
+mc tunnel list
+```
+
+```text
 1.0.10 (latest)
 1.0.9
 ...
@@ -48,9 +51,9 @@ command exists to provision one ahead of time.
 
 ### Examples
 
-```console
-$ mc tunnel install
-$ mc tunnel install playit@1.0.9
+```sh
+mc tunnel install
+mc tunnel install playit@1.0.9
 ```
 
 ## mc tunnel claim
@@ -78,8 +81,11 @@ or to replace an existing secret.
 
 ### Examples
 
-```console
-$ mc tunnel claim
+```sh
+mc tunnel claim
+```
+
+```text
     Claiming tunnel agent, approve it at https://playit.gg/claim/... with your playit.gg account
      Claimed tunnel agent secret saved to .tunnel/playit.toml
 ```

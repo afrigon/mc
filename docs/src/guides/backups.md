@@ -118,11 +118,17 @@ notification never fails the backup itself.
 
 List the available backups, then restore one:
 
-```console
-$ mc restore --list
+```sh
+mc restore --list
+```
+
+```text
 myserver_2026-07-15_15-00-00.tar.gz (latest)
 myserver_2026-07-14_15-00-00.tar.gz
-$ mc restore --backup myserver_2026-07-14_15-00-00.tar.gz
+```
+
+```sh
+mc restore --backup myserver_2026-07-14_15-00-00.tar.gz
 ```
 
 Without `--backup`, the most recent backup is restored. The instance must be

@@ -17,10 +17,10 @@ If you have used a package manager, the workflow will feel familiar: a
 declarative manifest, a generated lockfile, and a small set of commands that
 operate on them.
 
-```console
-$ mc init myserver --eula
-$ cd myserver
-$ mc run
+```sh
+mc init myserver --eula
+cd myserver
+mc run
 ```
 
 ## Sections
