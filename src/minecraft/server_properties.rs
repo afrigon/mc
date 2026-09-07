@@ -301,8 +301,8 @@ impl ServerProperties {
         Ok(password)
     }
 
-    // Mods read their own keys from server.properties, so an unknown key is a
-    // warning rather than an error.
+    // Mods read their own keys from the same file, so a key that is not a
+    // vanilla one is a warning rather than an error.
     pub fn unknown_keys(overrides: &BTreeMap<String, String>) -> McResult<Vec<String>> {
         let s = serde_java_properties::to_string(&ServerProperties::default())
             .context("could not serialize server.properties")?;

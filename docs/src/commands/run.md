@@ -9,8 +9,8 @@ missing or out of date is installed first: the Java runtime, the Minecraft
 binary, the mod loader, the mods (added, updated, and removed to match the
 manifest), and the tunnel agent when a tunnel is configured. The generated
 configuration files and player lists are rewritten from the manifest on
-every start. A warning is printed for every entry of the manifest's
-`properties` block that is not a vanilla server property.
+every start. A warning is printed for every key in the manifest's
+`properties` block that is not a known server property.
 
 Only one running server is allowed per instance directory; a second
 `mc run` refuses to start.

@@ -217,7 +217,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     for key in ServerProperties::unknown_keys(&property_overrides)? {
         _ = context.shell().warn(format!(
-            "the `{}` entry in `properties` is not a vanilla server property; it is written to server.properties as is",
+            "`{}` in the `properties` block of mc.kdl is not a known server property",
             key
         ));
     }
