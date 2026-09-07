@@ -19,6 +19,7 @@ use crate::manifest::Manifest;
 use crate::manifest::ManifestPaths;
 use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ManagedServerProperties;
+use crate::minecraft::server_properties::PropertyEntries;
 use crate::minecraft::server_properties::ServerProperties;
 use crate::ops;
 use crate::ops::backups::BackupOptions;
@@ -215,7 +216,17 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     let property_overrides = manifest.server.property_overrides()?;
 
-    let mut property_entries = properties.to_entries(&property_overrides, &managed_entries)?;
+    let PropertyEntries {
+        entries: mut property_entries,
+        unknown_keys
+    } = properties.to_entries(&property_overrides, &managed_entries)?;
+
+    for key in unknown_keys {
+        _ = context.shell().warn(format!(
+            "`{}` in the `properties` block of mc.kdl is not a known server property",
+            key
+        ));
+    }
 
     // rcon without a password would expose an unauthenticated console, so the
     // switch is derived from the effective password instead of set directly.
