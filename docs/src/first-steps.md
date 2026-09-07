@@ -34,7 +34,7 @@ server {
 }
 
 backups {
-    on
+    enabled #true
     frequency "0 0 * * * *"
 }
 

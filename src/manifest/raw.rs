@@ -98,7 +98,7 @@ pub struct RawMods {
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct RawBackups {
-    pub on: bool,
+    pub enabled: Option<bool>,
     pub frequency: Option<String>,
     pub keep: Option<usize>,
     pub local: Option<PathBuf>,

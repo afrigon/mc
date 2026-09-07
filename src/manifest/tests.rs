@@ -82,7 +82,7 @@ mods {
 }
 
 backups {
-    on
+    enabled #true
     frequency "0 30 * * * *"
     keep 5
     s3 "my-bucket" region="us-east-1"
@@ -413,10 +413,10 @@ fn backups_flag_forms() -> McResult<()> {
         BackupStorage::Local { keep: 3, .. }
     ));
 
-    let on = Manifest::from_kdl_str(&with_section("backups {\n    on\n}"))?;
+    let on = Manifest::from_kdl_str(&with_section("backups {\n    enabled #true\n}"))?;
     assert!(on.backups.enabled);
 
-    let explicit = Manifest::from_kdl_str(&with_section("backups {\n    on #false\n}"))?;
+    let explicit = Manifest::from_kdl_str(&with_section("backups {\n    enabled #false\n}"))?;
     assert!(!explicit.backups.enabled);
 
     Ok(())
@@ -598,6 +598,27 @@ fn managed_property_is_rejected() {
 }
 
 #[test]
+fn every_managed_property_is_reported_at_once() {
+    let source = with_section(
+        "server {\n    properties {\n        server-port 25566\n        white-list #false\n        enable-rcon #true\n    }\n}"
+    );
+    let message = error_message(Manifest::from_kdl_str(&source));
+
+    assert!(
+        message.contains("the `server-port` entry in `properties` is managed by mc; set `port` in `server` instead"),
+        "{message}"
+    );
+    assert!(
+        message.contains("the `white-list` entry in `properties` is managed by mc; set `allow-list` in `server` instead"),
+        "{message}"
+    );
+    assert!(
+        message.contains("the `enable-rcon` entry in `properties` is managed by mc; rcon is enabled when a rcon password is configured"),
+        "{message}"
+    );
+}
+
+#[test]
 fn rcon_password_property_is_rejected() {
     let source =
         with_section("server {\n    properties {\n        \"rcon.password\" \"hunter2\"\n    }\n}");
@@ -691,8 +712,9 @@ fn syntax_error_reports_position() {
 
 #[test]
 fn slashdash_node_is_ignored() -> McResult<()> {
-    let manifest =
-        Manifest::from_kdl_str(&with_section("backups {\n    /-local \"x\"\n    on\n}"))?;
+    let manifest = Manifest::from_kdl_str(&with_section(
+        "backups {\n    /-local \"x\"\n    enabled #true\n}"
+    ))?;
 
     assert!(manifest.backups.enabled);
     assert!(matches!(
@@ -955,7 +977,7 @@ fn preset_base_document_is_a_valid_manifest() -> McResult<()> {
          }\n\
          \n\
          backups {\n\
-         \x20   on\n\
+         \x20   enabled #true\n\
          \x20   frequency \"0 0 * * * *\"\n\
          }\n"
     );

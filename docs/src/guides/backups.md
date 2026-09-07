@@ -9,13 +9,14 @@ consistent, even under load.
 
 ```kdl
 backups {
-    on
+    enabled #true
     frequency "0 0 * * * *"
 }
 ```
 
-With `on` present, backups fire on the `frequency` schedule while the
-instance runs. `frequency` is a cron expression with six fields — seconds,
+With `enabled #true`, backups fire on the `frequency` schedule while the
+instance runs. Without it, or with a manifest that has no `backups` section,
+nothing is scheduled. `frequency` is a cron expression with six fields — seconds,
 minutes, hours, day of month, month, day of week. The example above backs up
 at the start of every hour.
 
@@ -30,7 +31,7 @@ password yourself.
 
 A backup can be taken at any time with
 [`mc backup`](../commands/backup.md), even when scheduled backups are
-disabled — `on` only controls the schedule. It works against a stopped
+disabled — `enabled` only controls the schedule. It works against a stopped
 instance, and against a running one as long as the instance was started with
 an RCON password configured (always the case when backups are enabled). When
 the instance is running but cannot be reached, mc refuses to back up rather

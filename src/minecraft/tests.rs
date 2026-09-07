@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
@@ -6,6 +8,7 @@ use crate::minecraft::players::BanDetails;
 use crate::minecraft::players::BanEntry;
 use crate::minecraft::players::OpEntry;
 use crate::minecraft::players::offline_uuid;
+use crate::minecraft::server_properties::ServerProperties;
 use crate::utils::errors::McResult;
 
 #[test]
@@ -47,6 +50,33 @@ fn op_entries_use_the_server_field_names() -> McResult<()> {
     assert_eq!(
         serde_json::to_string(&entry)?,
         r#"{"uuid":"00000000-0000-0000-0000-000000000000","name":"Notch","level":4,"bypassesPlayerLimit":true}"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn unknown_property_keys_are_reported() -> McResult<()> {
+    let overrides = BTreeMap::from([
+        (String::from("spawn-protection"), String::from("0")),
+        (String::from("query.port"), String::from("25565")),
+        (String::from("spawn-protetion"), String::from("0")),
+        (String::from("fabric.custom"), String::from("x"))
+    ]);
+
+    let result = ServerProperties::default().to_entries(&overrides, &BTreeMap::new())?;
+
+    assert_eq!(
+        result.unknown_keys,
+        vec!["fabric.custom", "spawn-protetion"]
+    );
+    assert_eq!(
+        result.entries.get("spawn-protection").map(String::as_str),
+        Some("0")
+    );
+    assert_eq!(
+        result.entries.get("spawn-protetion").map(String::as_str),
+        Some("0")
     );
 
     Ok(())
