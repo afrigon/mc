@@ -212,6 +212,11 @@ pub const MANAGED_PROPERTY_KEYS: [(&str, &str); 18] = [
     ("white-list", "set `allow-list` in `server` instead")
 ];
 
+pub struct PropertyEntries {
+    pub entries: BTreeMap<String, String>,
+    pub unknown_keys: Vec<String>
+}
+
 // The subset of server.properties driven by `mc.kdl` and the environment.
 // Serializing it yields the managed keys.
 #[derive(Serialize)]
@@ -301,42 +306,32 @@ impl ServerProperties {
         Ok(password)
     }
 
-    // Mods read their own keys from the same file, so a key that is not a
-    // vanilla one is a warning rather than an error.
-    pub fn unknown_keys(overrides: &BTreeMap<String, String>) -> McResult<Vec<String>> {
-        let s = serde_java_properties::to_string(&ServerProperties::default())
-            .context("could not serialize server.properties")?;
-
-        let known: BTreeMap<String, String> = serde_java_properties::from_str(&s)
-            .context("could not parse the generated server.properties")?;
-
-        Ok(overrides
-            .keys()
-            .filter(|key| {
-                !known.contains_key(*key)
-                    && !MANAGED_PROPERTY_KEYS
-                        .iter()
-                        .any(|(managed, _)| managed == key)
-            })
-            .cloned()
-            .collect())
-    }
-
     pub fn to_entries(
         &self,
         overrides: &BTreeMap<String, String>,
         managed: &BTreeMap<String, String>
-    ) -> McResult<BTreeMap<String, String>> {
+    ) -> McResult<PropertyEntries> {
         let s = serde_java_properties::to_string(self)
             .context("could not serialize server.properties")?;
 
         let mut entries: BTreeMap<String, String> = serde_java_properties::from_str(&s)
             .context("could not parse the generated server.properties")?;
 
+        // Mods read their own keys from the same file, so an override for a
+        // key that is not a vanilla one is reported rather than rejected.
+        let unknown_keys = overrides
+            .keys()
+            .filter(|key| !entries.contains_key(*key))
+            .cloned()
+            .collect();
+
         entries.extend(overrides.clone());
         entries.extend(managed.clone());
 
-        Ok(entries)
+        Ok(PropertyEntries {
+            entries,
+            unknown_keys
+        })
     }
 
     pub fn entries_to_string(entries: &BTreeMap<String, String>) -> McResult<String> {

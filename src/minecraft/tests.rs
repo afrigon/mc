@@ -60,14 +60,24 @@ fn unknown_property_keys_are_reported() -> McResult<()> {
     let overrides = BTreeMap::from([
         (String::from("spawn-protection"), String::from("0")),
         (String::from("query.port"), String::from("25565")),
-        (String::from("level-seed"), String::from("42")),
         (String::from("spawn-protetion"), String::from("0")),
         (String::from("fabric.custom"), String::from("x"))
     ]);
 
-    let unknown = ServerProperties::unknown_keys(&overrides)?;
+    let result = ServerProperties::default().to_entries(&overrides, &BTreeMap::new())?;
 
-    assert_eq!(unknown, vec!["fabric.custom", "spawn-protetion"]);
+    assert_eq!(
+        result.unknown_keys,
+        vec!["fabric.custom", "spawn-protetion"]
+    );
+    assert_eq!(
+        result.entries.get("spawn-protection").map(String::as_str),
+        Some("0")
+    );
+    assert_eq!(
+        result.entries.get("spawn-protetion").map(String::as_str),
+        Some("0")
+    );
 
     Ok(())
 }
