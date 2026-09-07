@@ -554,7 +554,7 @@ impl RawBackups {
         };
 
         Ok(ManifestBackups {
-            enabled: self.on,
+            enabled: self.enabled.unwrap_or(defaults.enabled),
             frequency: self.frequency.unwrap_or(defaults.frequency),
             storage
         })
