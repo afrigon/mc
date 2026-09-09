@@ -114,26 +114,13 @@ impl Shell {
     }
 
     /// Writes a forwarded child process line to stdout regardless of
-    /// verbosity, in the status form when `justified` and flush left
-    /// otherwise.
-    pub fn echo<S, M>(
-        &mut self,
-        status: S,
-        message: M,
-        style: &Style,
-        justified: bool
-    ) -> anyhow::Result<()>
+    /// verbosity.
+    pub fn echo<S, M>(&mut self, status: S, message: M, style: &Style) -> anyhow::Result<()>
     where
         S: fmt::Display,
         M: fmt::Display
     {
-        let buffer = if justified {
-            Shell::render(&status, Some(&message), style, true)?
-        } else {
-            format!("{style}{status}{style:#} {message}\n").into_bytes()
-        };
-
-        self.stdout.write_all(&buffer)?;
+        writeln!(self.stdout, "{style}{status}{style:#} {message}")?;
 
         Ok(())
     }

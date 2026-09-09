@@ -45,7 +45,7 @@ With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
 goes to `.tunnel/playitd.log` otherwise. When shown, every agent line is
-labeled with the provider's name, in the same form as the console lines. The first start from a terminal prints a claim link to approve in a
+labeled with the provider's name, like the console lines. The first start from a terminal prints a claim link to approve in a
 browser and saves the resulting secret under `.tunnel/`. Without a terminal
 and without a secret, `mc run` fails with instructions rather than waiting —
 see [Tunnels](../guides/tunnel.md).

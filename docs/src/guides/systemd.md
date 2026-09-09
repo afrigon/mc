@@ -77,7 +77,7 @@ agent, and mc's own status lines are easy to tell apart:
 ```text
 Minecraft ● Notch joined the game
       Joined Notch
-      Playit 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
+Playit 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
 ```
 
 mc's own log verbosity is controlled by the global `--verbose` flag; the
