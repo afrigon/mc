@@ -141,7 +141,7 @@ where
                         None => String::from("all dimensions flushed to disk")
                     };
 
-                    _ = shell.status("Save", message);
+                    _ = shell.status("Saved", message);
                 }
                 None => {}
             }

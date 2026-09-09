@@ -33,7 +33,7 @@ line.
 Minecraft ● Notch joined the game
       Joined Notch
 Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
-        Save all dimensions flushed to disk in 1.2s
+       Saved all dimensions flushed to disk in 1.2s
 ```
 
 Shown console lines carry a `Minecraft` label, a dot colored by the line's
