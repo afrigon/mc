@@ -395,7 +395,8 @@ where
             _ = shell.lock().unwrap_or_else(PoisonError::into_inner).echo(
                 label,
                 strip_str(line),
-                &styles::TUNNEL
+                &styles::TUNNEL,
+                true
             );
         })
         .await

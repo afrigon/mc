@@ -75,7 +75,7 @@ Each forwarded line is labeled with its source, so the instance, the tunnel
 agent, and mc's own status lines are easy to tell apart:
 
 ```text
-   Minecraft ● Notch joined the game
+Minecraft ● Notch joined the game
       Joined Notch
       Playit 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
 ```

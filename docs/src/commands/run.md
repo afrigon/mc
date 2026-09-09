@@ -28,14 +28,14 @@ console line that produced the event is shown as well, ahead of the status
 line.
 
 ```text
-   Minecraft ● Notch joined the game
+Minecraft ● Notch joined the game
       Joined Notch
-   Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
+Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
         Save all dimensions flushed to disk in 1.2s
 ```
 
-Shown console lines take the same form as mc's own status lines: a
-`Minecraft` label, a dot colored by the line's log level, and the message.
+Shown console lines carry a `Minecraft` label, a dot colored by the line's
+log level, and the message.
 Lines without a level, such as the continuation lines of a stack trace, keep
 the label and print as they are. When the `jvm-arguments` in the manifest
 select a logging configuration file of their own, the console keeps that
