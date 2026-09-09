@@ -71,13 +71,13 @@ tunnel agent as well):
 journalctl -u myserver -f
 ```
 
-Each forwarded line carries the prefix of its source, `MINECRAFT` or
-`TUNNEL`, so the two are easy to tell apart from mc's own status lines:
+Each forwarded line is labeled with its source, so the instance, the tunnel
+agent, and mc's own status lines are easy to tell apart:
 
 ```text
-MINECRAFT [INFO] [Server thread]: Notch joined the game
+   Minecraft ● Notch joined the game
       Joined Notch
-TUNNEL: 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
+      Playit 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
 ```
 
 mc's own log verbosity is controlled by the global `--verbose` flag; the

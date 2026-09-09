@@ -5,6 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::minecraft::log::ServerLogEvent;
+use crate::minecraft::log::ServerLogLevel;
 use crate::minecraft::log::ServerLogLine;
 use crate::minecraft::players::BanDetails;
 use crate::minecraft::players::BanEntry;
@@ -86,49 +87,73 @@ fn unknown_property_keys_are_reported() -> McResult<()> {
 
 #[test]
 fn console_lines_split_into_level_thread_and_message() {
-    let line = ServerLogLine::parse(
-        "MINECRAFT [WARN] [Worker-Main-3]: Can't keep up! Is the server overloaded?"
-    );
+    let line =
+        ServerLogLine::parse("[WARN] [Worker-Main-3]: Can't keep up! Is the server overloaded?");
 
     assert!(line.is_some_and(|line| {
-        line.level == "WARN"
+        line.level == ServerLogLevel::Warn
             && line.thread == "Worker-Main-3"
             && line.message == "Can't keep up! Is the server overloaded?"
     }));
     assert!(
         ServerLogLine::parse("[12:34:56] [Server thread/INFO]: Notch joined the game").is_none()
     );
+    assert!(ServerLogLine::parse("[LOUD] [Server thread]: Notch joined the game").is_none());
     assert!(
         ServerLogLine::parse("WARNING: A terminally deprecated method has been called").is_none()
     );
+    assert!(ServerLogLine::parse("\tat net.minecraft.server.MinecraftServer.run").is_none());
+}
+
+fn recognize(line: &str) -> Option<ServerLogEvent> {
+    ServerLogLine::parse(line)
+        .as_ref()
+        .and_then(ServerLogEvent::recognize)
 }
 
 #[test]
-fn join_and_leave_events_are_recognized() {
+fn join_leave_and_save_events_are_recognized() {
     assert_eq!(
-        ServerLogEvent::recognize("MINECRAFT [INFO] [Server thread]: Notch joined the game"),
+        recognize("[INFO] [Server thread]: Notch joined the game"),
         Some(ServerLogEvent::Joined(String::from("Notch")))
     );
     assert_eq!(
-        ServerLogEvent::recognize("MINECRAFT [INFO] [Server thread]: Notch left the game"),
+        recognize("[INFO] [Server thread]: Notch left the game"),
         Some(ServerLogEvent::Left(String::from("Notch")))
+    );
+    assert_eq!(
+        recognize(
+            "[INFO] [Server thread]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld"
+        ),
+        Some(ServerLogEvent::SaveStarted)
+    );
+    assert_eq!(
+        recognize(
+            "[INFO] [Server thread]: ThreadedAnvilChunkStorage (world): All chunks are saved"
+        ),
+        None
+    );
+    assert_eq!(
+        recognize("[INFO] [Server thread]: ThreadedAnvilChunkStorage: All dimensions are saved"),
+        Some(ServerLogEvent::SaveCompleted)
     );
 }
 
 #[test]
 fn player_controlled_text_is_not_an_event() {
     let lines = [
-        "MINECRAFT [INFO] [Server thread]: <Notch> Steve joined the game",
-        "MINECRAFT [INFO] [Server thread]: <Notch> joined the game",
-        "MINECRAFT [INFO] [Server thread]: [Server] Steve left the game",
-        "MINECRAFT [INFO] [Server thread]: * Notch left the game",
-        "MINECRAFT [INFO] [Server thread]:  joined the game",
-        "MINECRAFT [WARN] [Server thread]: Notch joined the game",
-        "MINECRAFT [INFO] [Netty Server IO #1]: Notch joined the game",
+        "[INFO] [Server thread]: <Notch> Steve joined the game",
+        "[INFO] [Server thread]: <Notch> joined the game",
+        "[INFO] [Server thread]: [Server] Steve left the game",
+        "[INFO] [Server thread]: * Notch left the game",
+        "[INFO] [Server thread]:  joined the game",
+        "[INFO] [Server thread]: <Notch> Saving chunks for level 'x'",
+        "[WARN] [Server thread]: Notch joined the game",
+        "[INFO] [Netty Server IO #1]: Notch joined the game",
         "[12:34:56] [Server thread/INFO]: Notch joined the game"
     ];
 
     for line in lines {
-        assert_eq!(ServerLogEvent::recognize(line), None, "{}", line);
+        assert_eq!(recognize(line), None, "{}", line);
     }
 }

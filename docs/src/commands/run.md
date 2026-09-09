@@ -22,17 +22,22 @@ is hidden unless `--server-logs` is passed; it is always written to
 the remote console (RCON) for live administration.
 
 mc reads the console output whether or not it is shown, and prints a status
-line for the events it recognizes: a player joining or leaving the instance.
-With `--server-logs`, the console line that produced the event is shown as
-well, ahead of the status line.
+line for the events it recognizes: a player joining or leaving the instance,
+and a completed world save with the time it took. With `--server-logs`, the
+console line that produced the event is shown as well, ahead of the status
+line.
 
 ```text
-MINECRAFT [INFO] [Server thread]: Notch joined the game
+   Minecraft ● Notch joined the game
       Joined Notch
+   Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
+    Autosave completed in 1.2s
 ```
 
-Console lines are prefixed with `MINECRAFT [LEVEL] [thread]:` when mc
-configures the instance's logging. When the `jvm-arguments` in the manifest
+Shown console lines take the same form as mc's own status lines: a
+`Minecraft` label, a dot colored by the line's log level, and the message.
+Lines without a level, such as the continuation lines of a stack trace, keep
+the label and print as they are. When the `jvm-arguments` in the manifest
 select a logging configuration file of their own, the console keeps that
 file's format and no events are recognized.
 
@@ -40,7 +45,7 @@ With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
 goes to `.tunnel/playitd.log` otherwise. When shown, every agent line is
-prefixed with `TUNNEL:`. The first start from a terminal prints a claim link to approve in a
+labeled with the provider's name, in the same form as the console lines. The first start from a terminal prints a claim link to approve in a
 browser and saves the resulting secret under `.tunnel/`. Without a terminal
 and without a secret, `mc run` fails with instructions rather than waiting —
 see [Tunnels](../guides/tunnel.md).
@@ -70,6 +75,6 @@ instance's exit code.
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
 - `--server-logs` — show the instance's console output in the terminal,
-  prefixed with `MINECRAFT`. Recognized events are printed either way.
-- `--tunnel-logs` — show the tunnel agent's output in the terminal,
-  prefixed with `TUNNEL:`.
+  labeled `Minecraft`. Recognized events are printed either way.
+- `--tunnel-logs` — show the tunnel agent's output in the terminal, labeled
+  with the provider's name.

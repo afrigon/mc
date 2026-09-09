@@ -7,6 +7,7 @@ use std::sync::PoisonError;
 use std::time::Duration;
 use std::time::Instant;
 
+use anstream::adapter::strip_str;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
@@ -16,6 +17,7 @@ use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::cli::styles;
 use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
@@ -312,6 +314,7 @@ pub struct TunnelAgentOptions {
     pub socket_path: String,
     pub log_level: &'static str,
     pub logs: bool,
+    pub provider: TunnelProviderKind,
     pub address: Option<String>
 }
 
@@ -381,16 +384,19 @@ async fn stop_agent(child: &mut Child) {
     let _ = child.kill().await;
 }
 
-fn forward_agent_output<R>(shell: Arc<Mutex<Shell>>, output: R)
+// The agent colors its own output; stripping it keeps the line in mc's
+// style rather than a mix of both.
+fn forward_agent_output<R>(shell: Arc<Mutex<Shell>>, label: &'static str, output: R)
 where
     R: AsyncRead + Unpin + Send + 'static
 {
     tokio::spawn(async move {
         utils::process::for_each_line(output, |line| {
-            _ = shell
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .echo(format!("TUNNEL: {}", line));
+            _ = shell.lock().unwrap_or_else(PoisonError::into_inner).echo(
+                label,
+                strip_str(line),
+                &styles::TUNNEL
+            );
         })
         .await
     });
@@ -433,11 +439,11 @@ pub fn supervise(
             };
 
             if let Some(stdout) = child.stdout.take() {
-                forward_agent_output(shell.clone(), stdout);
+                forward_agent_output(shell.clone(), options.provider.label(), stdout);
             }
 
             if let Some(stderr) = child.stderr.take() {
-                forward_agent_output(shell.clone(), stderr);
+                forward_agent_output(shell.clone(), options.provider.label(), stderr);
             }
 
             if let Some(address) = options.address.as_ref().filter(|_| !announced) {

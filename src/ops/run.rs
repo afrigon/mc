@@ -7,7 +7,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::PoisonError;
 use std::time::Duration;
+use std::time::Instant;
 
+use anstyle::Style;
 use anyhow::Context;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWriteExt;
@@ -16,12 +18,15 @@ use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
 use tokio_util::sync::CancellationToken;
 
+use crate::cli::styles;
 use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
 use crate::manifest::ManifestPaths;
 use crate::minecraft::log::ServerLogEvent;
+use crate::minecraft::log::ServerLogLevel;
+use crate::minecraft::log::ServerLogLine;
 use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ManagedServerProperties;
 use crate::minecraft::server_properties::PropertyEntries;
@@ -70,6 +75,16 @@ pub struct RunOptions {
     pub tunnel_logs: bool
 }
 
+fn level_style(level: ServerLogLevel) -> &'static Style {
+    match level {
+        ServerLogLevel::Fatal | ServerLogLevel::Error => &styles::LOG_ERROR,
+        ServerLogLevel::Warn => &styles::LOG_WARN,
+        ServerLogLevel::Info => &styles::LOG_INFO,
+        ServerLogLevel::Debug => &styles::LOG_DEBUG,
+        ServerLogLevel::Trace => &styles::LOG_TRACE
+    }
+}
+
 /// Drains one of the server's output pipes, echoing every line when
 /// `echo` is set and printing the events it recognizes either way.
 fn forward_server_output<R>(shell: Arc<Mutex<Shell>>, output: R, echo: bool) -> JoinHandle<()>
@@ -77,17 +92,42 @@ where
     R: AsyncRead + Unpin + Send + 'static
 {
     tokio::spawn(async move {
+        let mut save_started: Option<Instant> = None;
+
         utils::process::for_each_line(output, |line| {
-            let event = ServerLogEvent::recognize(line);
+            let parsed = ServerLogLine::parse(line);
+            let event = parsed.as_ref().and_then(ServerLogEvent::recognize);
             let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
 
             if echo {
-                _ = shell.echo(line);
+                match &parsed {
+                    Some(parsed) => {
+                        let dot = level_style(parsed.level);
+
+                        _ = shell.echo(
+                            "Minecraft",
+                            format!("{dot}●{dot:#} {}", parsed.message),
+                            &styles::MINECRAFT
+                        );
+                    }
+                    None => _ = shell.echo("Minecraft", line, &styles::MINECRAFT)
+                }
             }
 
             match event {
                 Some(ServerLogEvent::Joined(name)) => _ = shell.status("Joined", name),
                 Some(ServerLogEvent::Left(name)) => _ = shell.status("Left", name),
+                Some(ServerLogEvent::SaveStarted) => {
+                    save_started.get_or_insert_with(Instant::now);
+                }
+                Some(ServerLogEvent::SaveCompleted) => {
+                    let message = match save_started.take() {
+                        Some(started) => format!("completed in {:.1?}", started.elapsed()),
+                        None => String::from("completed")
+                    };
+
+                    _ = shell.status("Autosave", message);
+                }
                 None => {}
             }
         })
@@ -313,6 +353,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if let Some(ref tunnel) = manifest.tunnel {
         let tunnel_descriptor = tunnel.provider_descriptor(context).await?;
+        let tunnel_provider = tunnel_descriptor.product;
         let agent_path =
             ops::tunnel::agent_path(&tunnel_directory, &tunnel_descriptor, current_platform);
 
@@ -374,6 +415,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             socket_path: ops::tunnel::socket_path(&manifest.name),
             log_level: server_log_level,
             logs: options.tunnel_logs,
+            provider: tunnel_provider,
             address: tunnel_address.clone()
         });
     }

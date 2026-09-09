@@ -1,19 +1,43 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServerLogLevel {
+    Fatal,
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace
+}
+
+impl ServerLogLevel {
+    fn parse(level: &str) -> Option<Self> {
+        match level {
+            "FATAL" => Some(ServerLogLevel::Fatal),
+            "ERROR" => Some(ServerLogLevel::Error),
+            "WARN" => Some(ServerLogLevel::Warn),
+            "INFO" => Some(ServerLogLevel::Info),
+            "DEBUG" => Some(ServerLogLevel::Debug),
+            "TRACE" => Some(ServerLogLevel::Trace),
+            _ => None
+        }
+    }
+}
+
 /// A console line as printed with the pattern mc writes into `log4j2.xml`:
-/// `MINECRAFT [LEVEL] [thread]: message`.
+/// `[LEVEL] [thread]: message`.
 pub struct ServerLogLine<'a> {
-    pub level: &'a str,
+    pub level: ServerLogLevel,
     pub thread: &'a str,
     pub message: &'a str
 }
 
 impl<'a> ServerLogLine<'a> {
     pub fn parse(line: &'a str) -> Option<Self> {
-        let rest = line.strip_prefix("MINECRAFT [")?;
+        let rest = line.strip_prefix('[')?;
         let (level, rest) = rest.split_once("] [")?;
         let (thread, message) = rest.split_once("]: ")?;
 
         Some(ServerLogLine {
-            level,
+            level: ServerLogLevel::parse(level)?,
             thread,
             message
         })
@@ -23,14 +47,14 @@ impl<'a> ServerLogLine<'a> {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ServerLogEvent {
     Joined(String),
-    Left(String)
+    Left(String),
+    SaveStarted,
+    SaveCompleted
 }
 
 impl ServerLogEvent {
-    pub fn recognize(line: &str) -> Option<Self> {
-        let line = ServerLogLine::parse(line)?;
-
-        if line.level != "INFO" || line.thread != "Server thread" {
+    pub fn recognize(line: &ServerLogLine<'_>) -> Option<Self> {
+        if line.level != ServerLogLevel::Info || line.thread != "Server thread" {
             return None;
         }
 
@@ -40,6 +64,14 @@ impl ServerLogEvent {
 
         if let Some(name) = line.message.strip_suffix(" left the game") {
             return player_name(name).map(ServerLogEvent::Left);
+        }
+
+        if line.message.starts_with("Saving chunks for level '") {
+            return Some(ServerLogEvent::SaveStarted);
+        }
+
+        if line.message == "ThreadedAnvilChunkStorage: All dimensions are saved" {
+            return Some(ServerLogEvent::SaveCompleted);
         }
 
         None

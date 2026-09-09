@@ -56,8 +56,8 @@ new agent on the next start.
 
 The agent runs for as long as the instance does and is restarted by mc if it
 stops on its own. Its output is written to `.tunnel/playitd.log`, or shown in
-the terminal, prefixed with `TUNNEL:`, when the instance is started with
-`mc run --tunnel-logs`.
+the terminal, labeled with the provider's name, when the instance is started
+with `mc run --tunnel-logs`.
 Stopping the instance stops the agent.
 
 Traffic between players and the instance flows through the provider's relay,

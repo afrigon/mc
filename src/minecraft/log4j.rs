@@ -2,7 +2,7 @@ const TEMPLATE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
     <Appenders>
         <Console name="SysOut" target="SYSTEM_OUT">
-            <PatternLayout pattern="MINECRAFT [%level] [%t]: %msg{nolookups}%n" />
+            <PatternLayout pattern="[%level] [%t]: %msg{nolookups}%n" />
         </Console>
         <RollingRandomAccessFile name="File" fileName="logs/latest.log" filePattern="logs/%d{yyyy-MM-dd}-%i.log.gz">
             <PatternLayout pattern="[%d{HH:mm:ss}] [%t/%level]: %msg{nolookups}%n" />

@@ -1,3 +1,4 @@
+use anstyle::Ansi256Color;
 use anstyle::AnsiColor;
 use anstyle::Effects;
 use anstyle::Style;
@@ -11,6 +12,13 @@ pub const ERROR: Style = annotate_snippets::renderer::DEFAULT_ERROR_STYLE;
 pub const WARN: Style = annotate_snippets::renderer::DEFAULT_WARNING_STYLE;
 pub const VALID: Style = AnsiColor::BrightCyan.on_default().effects(Effects::BOLD);
 pub const INVALID: Style = annotate_snippets::renderer::DEFAULT_WARNING_STYLE;
+pub const MINECRAFT: Style = AnsiColor::Green.on_default().effects(Effects::BOLD);
+pub const TUNNEL: Style = Ansi256Color(208).on_default().effects(Effects::BOLD);
+pub const LOG_ERROR: Style = AnsiColor::Red.on_default();
+pub const LOG_WARN: Style = AnsiColor::Yellow.on_default();
+pub const LOG_INFO: Style = AnsiColor::Green.on_default();
+pub const LOG_DEBUG: Style = AnsiColor::Cyan.on_default();
+pub const LOG_TRACE: Style = Style::new().effects(Effects::DIMMED);
 
 pub fn styles() -> Styles {
     Styles::styled()

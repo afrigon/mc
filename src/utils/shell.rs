@@ -64,13 +64,12 @@ impl Shell {
         self.stderr = AutoStream::new(std::io::stderr(), self.color_choice);
     }
 
-    fn output_stderr(
-        &mut self,
+    fn render(
         status: &dyn fmt::Display,
         message: Option<&dyn fmt::Display>,
         style: &Style,
         justified: bool
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Vec<u8>> {
         let mut buffer = Vec::new();
 
         if justified {
@@ -83,6 +82,18 @@ impl Shell {
             Some(message) => writeln!(buffer, " {message}")?,
             None => write!(buffer, " ")?
         }
+
+        Ok(buffer)
+    }
+
+    fn output_stderr(
+        &mut self,
+        status: &dyn fmt::Display,
+        message: Option<&dyn fmt::Display>,
+        style: &Style,
+        justified: bool
+    ) -> anyhow::Result<()> {
+        let buffer = Shell::render(status, message, style, justified)?;
 
         self.stderr.write_all(&buffer)?;
 
@@ -102,12 +113,16 @@ impl Shell {
         }
     }
 
-    /// Writes a forwarded child process line to stdout regardless of verbosity.
-    pub fn echo<M>(&mut self, line: M) -> anyhow::Result<()>
+    /// Writes a forwarded child process line to stdout in the status form,
+    /// regardless of verbosity.
+    pub fn echo<S, M>(&mut self, status: S, message: M, style: &Style) -> anyhow::Result<()>
     where
+        S: fmt::Display,
         M: fmt::Display
     {
-        writeln!(self.stdout, "{line}")?;
+        let buffer = Shell::render(&status, Some(&message), style, true)?;
+
+        self.stdout.write_all(&buffer)?;
 
         Ok(())
     }
