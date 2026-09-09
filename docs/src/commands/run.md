@@ -21,10 +21,26 @@ is hidden unless `--server-logs` is passed; it is always written to
 `instance/logs/` by the server itself. The console is not interactive; use
 the remote console (RCON) for live administration.
 
+mc reads the console output whether or not it is shown, and prints a status
+line for the events it recognizes: a player joining or leaving the instance.
+With `--server-logs`, the console line that produced the event is shown as
+well, ahead of the status line.
+
+```text
+MINECRAFT [INFO] [Server thread]: Notch joined the game
+      Joined Notch
+```
+
+Console lines are prefixed with `MINECRAFT [LEVEL] [thread]:` when mc
+configures the instance's logging. When the `jvm-arguments` in the manifest
+select a logging configuration file of their own, the console keeps that
+file's format and no events are recognized.
+
 With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
-goes to `.tunnel/playitd.log` otherwise. The first start from a terminal prints a claim link to approve in a
+goes to `.tunnel/playitd.log` otherwise. When shown, every agent line is
+prefixed with `TUNNEL:`. The first start from a terminal prints a claim link to approve in a
 browser and saves the resulting secret under `.tunnel/`. Without a terminal
 and without a secret, `mc run` fails with instructions rather than waiting —
 see [Tunnels](../guides/tunnel.md).
@@ -53,5 +69,7 @@ instance's exit code.
 
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
-- `--server-logs` — show the instance's console output in the terminal.
-- `--tunnel-logs` — show the tunnel agent's output in the terminal.
+- `--server-logs` — show the instance's console output in the terminal,
+  prefixed with `MINECRAFT`. Recognized events are printed either way.
+- `--tunnel-logs` — show the tunnel agent's output in the terminal,
+  prefixed with `TUNNEL:`.

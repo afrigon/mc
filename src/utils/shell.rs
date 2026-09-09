@@ -102,6 +102,16 @@ impl Shell {
         }
     }
 
+    /// Writes a forwarded child process line to stdout regardless of verbosity.
+    pub fn echo<M>(&mut self, line: M) -> anyhow::Result<()>
+    where
+        M: fmt::Display
+    {
+        writeln!(self.stdout, "{line}")?;
+
+        Ok(())
+    }
+
     pub fn status<S, M>(&mut self, status: S, message: M) -> anyhow::Result<()>
     where
         S: fmt::Display,

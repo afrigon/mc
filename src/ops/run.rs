@@ -3,11 +3,15 @@ use std::io::ErrorKind;
 use std::io::IsTerminal;
 use std::process::ExitStatus;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::PoisonError;
 use std::time::Duration;
 
 use anyhow::Context;
+use tokio::io::AsyncRead;
 use tokio::io::AsyncWriteExt;
+use tokio::task::JoinHandle;
 use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
 use tokio_util::sync::CancellationToken;
@@ -17,6 +21,7 @@ use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
 use crate::manifest::ManifestPaths;
+use crate::minecraft::log::ServerLogEvent;
 use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ManagedServerProperties;
 use crate::minecraft::server_properties::PropertyEntries;
@@ -37,6 +42,7 @@ use crate::ops::tunnel::TunnelInstallOptions;
 use crate::services::playit_api::DASHBOARD_TUNNELS_URL;
 use crate::utils;
 use crate::utils::errors::McResult;
+use crate::utils::shell::Shell;
 
 /// How long to wait for the server to save and exit after asking it to stop
 /// before forcing it down. Kept under systemd's default 90s `TimeoutStopSec` so
@@ -64,12 +70,29 @@ pub struct RunOptions {
     pub tunnel_logs: bool
 }
 
-fn child_output(shown: bool) -> Stdio {
-    if shown {
-        Stdio::inherit()
-    } else {
-        Stdio::null()
-    }
+/// Drains one of the server's output pipes, echoing every line when
+/// `echo` is set and printing the events it recognizes either way.
+fn forward_server_output<R>(shell: Arc<Mutex<Shell>>, output: R, echo: bool) -> JoinHandle<()>
+where
+    R: AsyncRead + Unpin + Send + 'static
+{
+    tokio::spawn(async move {
+        utils::process::for_each_line(output, |line| {
+            let event = ServerLogEvent::recognize(line);
+            let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+            if echo {
+                _ = shell.echo(line);
+            }
+
+            match event {
+                Some(ServerLogEvent::Joined(name)) => _ = shell.status("Joined", name),
+                Some(ServerLogEvent::Left(name)) => _ = shell.status("Left", name),
+                None => {}
+            }
+        })
+        .await
+    })
 }
 
 fn has_jvm_property(arguments: &[String], property: &str) -> bool {
@@ -385,8 +408,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .arg("--nogui")
         .current_dir(&instance_path)
         .stdin(Stdio::piped())
-        .stdout(child_output(options.server_logs))
-        .stderr(child_output(options.server_logs))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
 
     utils::process::detach_from_terminal_signals(&mut command);
@@ -410,6 +433,19 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     });
 
     let mut child = command.spawn()?;
+
+    let server_stdout = child
+        .stdout
+        .take()
+        .context("could not attach to the minecraft server output")?;
+    let server_stderr = child
+        .stderr
+        .take()
+        .context("could not attach to the minecraft server output")?;
+    let output_readers = [
+        forward_server_output(context.shell_handle(), server_stdout, options.server_logs),
+        forward_server_output(context.shell_handle(), server_stderr, options.server_logs)
+    ];
 
     if let Some(ref notifier) = notifier {
         notifier
@@ -571,6 +607,10 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             }
         }
     };
+
+    for reader in output_readers {
+        let _ = reader.await;
+    }
 
     tunnel_cancel.cancel();
 

@@ -10,6 +10,7 @@ use std::time::Instant;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
+use tokio::io::AsyncRead;
 use tokio::process::Child;
 use tokio::process::Command;
 use tokio::task::JoinHandle;
@@ -325,14 +326,18 @@ fn agent_command(options: &TunnelAgentOptions) -> Command {
         .env("PLAYIT_LOG", options.log_level)
         .current_dir(&options.work_directory)
         .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     // The agent logs to stderr unless given a log file, so hidden output is
     // kept on disk rather than dropped.
-    if !options.logs {
-        command.arg("--log-path").arg(LOG_FILE_NAME);
+    if options.logs {
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    } else {
+        command
+            .arg("--log-path")
+            .arg(LOG_FILE_NAME)
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
     }
 
     utils::process::detach_from_terminal_signals(&mut command);
@@ -376,6 +381,21 @@ async fn stop_agent(child: &mut Child) {
     let _ = child.kill().await;
 }
 
+fn forward_agent_output<R>(shell: Arc<Mutex<Shell>>, output: R)
+where
+    R: AsyncRead + Unpin + Send + 'static
+{
+    tokio::spawn(async move {
+        utils::process::for_each_line(output, |line| {
+            _ = shell
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .echo(format!("TUNNEL: {}", line));
+        })
+        .await
+    });
+}
+
 fn warn(shell: &Arc<Mutex<Shell>>, message: String) {
     _ = shell
         .lock()
@@ -411,6 +431,14 @@ pub fn supervise(
                     return;
                 }
             };
+
+            if let Some(stdout) = child.stdout.take() {
+                forward_agent_output(shell.clone(), stdout);
+            }
+
+            if let Some(stderr) = child.stderr.take() {
+                forward_agent_output(shell.clone(), stderr);
+            }
 
             if let Some(address) = options.address.as_ref().filter(|_| !announced) {
                 announced = true;
