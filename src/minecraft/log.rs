@@ -22,23 +22,44 @@ impl ServerLogLevel {
     }
 }
 
-/// A console line as printed with the pattern mc writes into `log4j2.xml`:
-/// `[LEVEL] [thread]: message`.
+/// A console line, either printed with the pattern mc writes into
+/// `log4j2.xml` (`[LEVEL] [thread]: message`) or by the JVM itself outside
+/// the logger (`WARNING: message`, `ERROR: message`), which has no thread.
 pub struct ServerLogLine<'a> {
     pub level: ServerLogLevel,
-    pub thread: &'a str,
+    pub thread: Option<&'a str>,
     pub message: &'a str
 }
 
 impl<'a> ServerLogLine<'a> {
     pub fn parse(line: &'a str) -> Option<Self> {
+        Self::parse_logger(line).or_else(|| Self::parse_jvm(line))
+    }
+
+    fn parse_logger(line: &'a str) -> Option<Self> {
         let rest = line.strip_prefix('[')?;
         let (level, rest) = rest.split_once("] [")?;
         let (thread, message) = rest.split_once("]: ")?;
 
         Some(ServerLogLine {
             level: ServerLogLevel::parse(level)?,
-            thread,
+            thread: Some(thread),
+            message
+        })
+    }
+
+    fn parse_jvm(line: &'a str) -> Option<Self> {
+        let (level, message) = if let Some(message) = line.strip_prefix("WARNING: ") {
+            (ServerLogLevel::Warn, message)
+        } else if let Some(message) = line.strip_prefix("ERROR: ") {
+            (ServerLogLevel::Error, message)
+        } else {
+            return None;
+        };
+
+        Some(ServerLogLine {
+            level,
+            thread: None,
             message
         })
     }
@@ -54,7 +75,7 @@ pub enum ServerLogEvent {
 
 impl ServerLogEvent {
     pub fn recognize(line: &ServerLogLine<'_>) -> Option<Self> {
-        if line.level != ServerLogLevel::Info || line.thread != "Server thread" {
+        if line.level != ServerLogLevel::Info || line.thread != Some("Server thread") {
             return None;
         }
 
