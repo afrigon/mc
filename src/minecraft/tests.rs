@@ -4,6 +4,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
+use crate::minecraft::log::RefusalReason;
 use crate::minecraft::log::ServerLogEvent;
 use crate::minecraft::log::ServerLogLevel;
 use crate::minecraft::log::ServerLogLine;
@@ -146,18 +147,7 @@ fn join_leave_and_save_events_are_recognized() {
         recognize("[INFO] [Server thread]: Notch lost connection: Timed out"),
         Some(ServerLogEvent::Disconnected {
             name: String::from("Notch"),
-            address: None,
             reason: String::from("Timed out")
-        })
-    );
-    assert_eq!(
-        recognize(
-            "[INFO] [Server thread]: Notch (/[0:0:0:0:0:0:0:1]:49242) lost connection: You are not white-listed on this server!"
-        ),
-        Some(ServerLogEvent::Disconnected {
-            name: String::from("Notch"),
-            address: Some(String::from("[0:0:0:0:0:0:0:1]:49242")),
-            reason: String::from("You are not white-listed on this server!")
         })
     );
     assert_eq!(
@@ -176,6 +166,40 @@ fn join_leave_and_save_events_are_recognized() {
         recognize("[INFO] [Server thread]: ThreadedAnvilChunkStorage: All dimensions are saved"),
         Some(ServerLogEvent::SaveCompleted)
     );
+}
+
+#[test]
+fn refused_logins_carry_a_typed_reason() {
+    let cases = [
+        (
+            "You are not white-listed on this server!",
+            RefusalReason::NotInAllowList
+        ),
+        ("You are banned from this server.", RefusalReason::Banned),
+        (
+            "Your IP address is banned from this server.",
+            RefusalReason::AddressBanned
+        ),
+        ("The server is full!", RefusalReason::Full),
+        ("That name is already taken", RefusalReason::NameTaken),
+        ("Timed out", RefusalReason::Other(String::from("Timed out")))
+    ];
+
+    for (raw, reason) in cases {
+        assert_eq!(
+            recognize(&format!(
+                "[INFO] [Server thread]: Notch (/[0:0:0:0:0:0:0:1]:49242) lost connection: {}",
+                raw
+            )),
+            Some(ServerLogEvent::Refused {
+                name: String::from("Notch"),
+                address: String::from("[0:0:0:0:0:0:0:1]:49242"),
+                reason
+            }),
+            "{}",
+            raw
+        );
+    }
 }
 
 #[test]

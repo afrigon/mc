@@ -130,24 +130,19 @@ where
                         _ = shell.status("Left", name);
                     }
                 }
-                Some(ServerLogEvent::Disconnected {
-                    name,
-                    address,
-                    reason
-                }) => {
+                Some(ServerLogEvent::Disconnected { name, reason }) => {
                     if !QUIET_DISCONNECT_REASONS.contains(&reason.as_str()) {
-                        match address {
-                            Some(address) => {
-                                _ = shell.warn(format!(
-                                    "{} ({}) lost connection: {}",
-                                    name, address, reason
-                                ));
-                            }
-                            None => {
-                                _ = shell.warn(format!("{} lost connection: {}", name, reason));
-                                warned_disconnects.insert(name);
-                            }
-                        }
+                        _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                        warned_disconnects.insert(name);
+                    }
+                }
+                Some(ServerLogEvent::Refused { name, reason, .. }) => {
+                    let quiet = reason
+                        .raw()
+                        .is_some_and(|reason| QUIET_DISCONNECT_REASONS.contains(&reason));
+
+                    if !quiet {
+                        _ = shell.warn(format!("connection refused for {}, {}", name, reason));
                     }
                 }
                 Some(ServerLogEvent::SaveStarted) => {

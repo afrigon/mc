@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServerLogLevel {
     Fatal,
@@ -66,15 +68,63 @@ impl<'a> ServerLogLine<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum RefusalReason {
+    NotInAllowList,
+    Banned,
+    AddressBanned,
+    Full,
+    NameTaken,
+    Other(String)
+}
+
+impl RefusalReason {
+    fn parse(reason: &str) -> Self {
+        match reason.trim_end_matches(['!', '.']) {
+            "You are not white-listed on this server" => RefusalReason::NotInAllowList,
+            "You are banned from this server" => RefusalReason::Banned,
+            "Your IP address is banned from this server"
+            | "You have been IP banned from this server" => RefusalReason::AddressBanned,
+            "The server is full" => RefusalReason::Full,
+            "That name is already taken" => RefusalReason::NameTaken,
+            _ => RefusalReason::Other(reason.to_string())
+        }
+    }
+
+    pub fn raw(&self) -> Option<&str> {
+        match self {
+            RefusalReason::Other(reason) => Some(reason),
+            _ => None
+        }
+    }
+}
+
+impl fmt::Display for RefusalReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RefusalReason::NotInAllowList => write!(f, "the user is not in the allow list"),
+            RefusalReason::Banned => write!(f, "the user is banned"),
+            RefusalReason::AddressBanned => write!(f, "the address is banned"),
+            RefusalReason::Full => write!(f, "the instance is full"),
+            RefusalReason::NameTaken => write!(f, "the name is already taken"),
+            RefusalReason::Other(reason) => write!(f, "{}", reason)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum ServerLogEvent {
     Joined(String),
     Left(String),
-    /// The address is present while the player is still logging in, which
-    /// is how refused logins are reported.
     Disconnected {
         name: String,
-        address: Option<String>,
         reason: String
+    },
+    /// A connection dropped while the player was still logging in, which is
+    /// how a login turned away by the server is reported.
+    Refused {
+        name: String,
+        address: String,
+        reason: RefusalReason
     },
     SaveStarted,
     SaveCompleted
@@ -95,19 +145,21 @@ impl ServerLogEvent {
         }
 
         if let Some((subject, reason)) = line.message.split_once(" lost connection: ") {
-            let (name, address) = match subject
+            let login = subject
                 .strip_suffix(')')
-                .and_then(|subject| subject.split_once(" (/"))
-            {
-                Some((name, address)) => (name, Some(address.to_string())),
-                None => (subject, None)
-            };
+                .and_then(|subject| subject.split_once(" (/"));
 
-            return player_name(name).map(|name| ServerLogEvent::Disconnected {
-                name,
-                address,
-                reason: reason.to_string()
-            });
+            return match login {
+                Some((name, address)) => player_name(name).map(|name| ServerLogEvent::Refused {
+                    name,
+                    address: address.to_string(),
+                    reason: RefusalReason::parse(reason)
+                }),
+                None => player_name(subject).map(|name| ServerLogEvent::Disconnected {
+                    name,
+                    reason: reason.to_string()
+                })
+            };
         }
 
         if line.message.starts_with("Saving chunks for level '") {

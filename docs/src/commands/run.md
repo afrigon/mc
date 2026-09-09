@@ -26,8 +26,12 @@ line for the events it recognizes: a player joining or leaving the instance,
 and a world save flushed to disk with the time it took. A player dropped for
 any reason other than quitting or the instance stopping, such as a timeout
 or a kick, is reported as a warning with the reason in place of the leave
-line. A login turned away, by the allow list, a ban, or a full instance,
-is reported the same way along with the address it came from. With `--server-logs`, the
+line. A login turned away is reported as a warning naming the cause: the
+allow list, a ban, a full instance, or a taken name.
+
+```text
+warning: connection refused for Notch, the user is not in the allow list
+``` With `--server-logs`, the
 console line that produced the event is shown as well, ahead of the status
 line.
 
