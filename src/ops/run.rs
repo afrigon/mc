@@ -122,11 +122,14 @@ where
                 }
                 Some(ServerLogEvent::SaveCompleted) => {
                     let message = match save_started.take() {
-                        Some(started) => format!("completed in {:.1?}", started.elapsed()),
-                        None => String::from("completed")
+                        Some(started) => format!(
+                            "all dimensions flushed to disk in {:.1?}",
+                            started.elapsed()
+                        ),
+                        None => String::from("all dimensions flushed to disk")
                     };
 
-                    _ = shell.status("Autosave", message);
+                    _ = shell.status("Save", message);
                 }
                 None => {}
             }

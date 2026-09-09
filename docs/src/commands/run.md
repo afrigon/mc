@@ -23,7 +23,7 @@ the remote console (RCON) for live administration.
 
 mc reads the console output whether or not it is shown, and prints a status
 line for the events it recognizes: a player joining or leaving the instance,
-and a completed world save with the time it took. With `--server-logs`, the
+and a world save flushed to disk with the time it took. With `--server-logs`, the
 console line that produced the event is shown as well, ahead of the status
 line.
 
@@ -31,7 +31,7 @@ line.
    Minecraft ● Notch joined the game
       Joined Notch
    Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
-    Autosave completed in 1.2s
+        Save all dimensions flushed to disk in 1.2s
 ```
 
 Shown console lines take the same form as mc's own status lines: a
