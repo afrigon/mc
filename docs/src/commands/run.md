@@ -35,7 +35,8 @@ Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
 ```
 
 Shown console lines carry a `Minecraft` label, a dot colored by the line's
-log level, and the message.
+log level, and the message. Warnings and errors the Java runtime prints
+outside the logger get their dot from the `WARNING:` or `ERROR:` prefix.
 Lines without a level, such as the continuation lines of a stack trace, keep
 the label and print as they are. When the `jvm-arguments` in the manifest
 select a logging configuration file of their own, the console keeps that

@@ -92,17 +92,38 @@ fn console_lines_split_into_level_thread_and_message() {
 
     assert!(line.is_some_and(|line| {
         line.level == ServerLogLevel::Warn
-            && line.thread == "Worker-Main-3"
+            && line.thread == Some("Worker-Main-3")
             && line.message == "Can't keep up! Is the server overloaded?"
     }));
     assert!(
         ServerLogLine::parse("[12:34:56] [Server thread/INFO]: Notch joined the game").is_none()
     );
     assert!(ServerLogLine::parse("[LOUD] [Server thread]: Notch joined the game").is_none());
-    assert!(
-        ServerLogLine::parse("WARNING: A terminally deprecated method has been called").is_none()
-    );
     assert!(ServerLogLine::parse("\tat net.minecraft.server.MinecraftServer.run").is_none());
+    assert!(
+        ServerLogLine::parse(
+            "Starting net.fabricmc.loader.impl.game.minecraft.BundlerClassPathCapture"
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn jvm_lines_carry_a_level_but_no_thread() {
+    let line = ServerLogLine::parse(
+        "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called"
+    );
+
+    assert!(line.is_some_and(|line| {
+        line.level == ServerLogLevel::Warn
+            && line.thread.is_none()
+            && line.message == "A terminally deprecated method in sun.misc.Unsafe has been called"
+    }));
+
+    let line = ServerLogLine::parse("ERROR: Could not create the Java Virtual Machine.");
+
+    assert!(line.is_some_and(|line| line.level == ServerLogLevel::Error && line.thread.is_none()));
+    assert_eq!(recognize("WARNING: Notch joined the game"), None);
 }
 
 fn recognize(line: &str) -> Option<ServerLogEvent> {
