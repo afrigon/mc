@@ -107,10 +107,11 @@ where
                         _ = shell.echo(
                             "Minecraft",
                             format!("{dot}●{dot:#} {}", parsed.message),
-                            &styles::MINECRAFT
+                            &styles::MINECRAFT,
+                            false
                         );
                     }
-                    None => _ = shell.echo("Minecraft", line, &styles::MINECRAFT)
+                    None => _ = shell.echo("Minecraft", line, &styles::MINECRAFT, false)
                 }
             }
 
