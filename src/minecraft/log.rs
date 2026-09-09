@@ -69,6 +69,7 @@ impl<'a> ServerLogLine<'a> {
 pub enum ServerLogEvent {
     Joined(String),
     Left(String),
+    Disconnected { name: String, reason: String },
     SaveStarted,
     SaveCompleted
 }
@@ -85,6 +86,13 @@ impl ServerLogEvent {
 
         if let Some(name) = line.message.strip_suffix(" left the game") {
             return player_name(name).map(ServerLogEvent::Left);
+        }
+
+        if let Some((name, reason)) = line.message.split_once(" lost connection: ") {
+            return player_name(name).map(|name| ServerLogEvent::Disconnected {
+                name,
+                reason: reason.to_string()
+            });
         }
 
         if line.message.starts_with("Saving chunks for level '") {

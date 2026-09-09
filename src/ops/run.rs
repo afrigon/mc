@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env;
 use std::io::ErrorKind;
 use std::io::IsTerminal;
@@ -93,6 +94,7 @@ where
 {
     tokio::spawn(async move {
         let mut save_started: Option<Instant> = None;
+        let mut warned_disconnects: HashSet<String> = HashSet::new();
 
         utils::process::for_each_line(output, |line| {
             let parsed = ServerLogLine::parse(line);
@@ -116,7 +118,17 @@ where
 
             match event {
                 Some(ServerLogEvent::Joined(name)) => _ = shell.status("Joined", name),
-                Some(ServerLogEvent::Left(name)) => _ = shell.status("Left", name),
+                Some(ServerLogEvent::Left(name)) => {
+                    if !warned_disconnects.remove(&name) {
+                        _ = shell.status("Left", name);
+                    }
+                }
+                Some(ServerLogEvent::Disconnected { name, reason }) => {
+                    if reason != "Disconnected" {
+                        _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                        warned_disconnects.insert(name);
+                    }
+                }
                 Some(ServerLogEvent::SaveStarted) => {
                     save_started.get_or_insert_with(Instant::now);
                 }

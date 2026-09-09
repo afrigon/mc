@@ -143,6 +143,13 @@ fn join_leave_and_save_events_are_recognized() {
         Some(ServerLogEvent::Left(String::from("Notch")))
     );
     assert_eq!(
+        recognize("[INFO] [Server thread]: Notch lost connection: Timed out"),
+        Some(ServerLogEvent::Disconnected {
+            name: String::from("Notch"),
+            reason: String::from("Timed out")
+        })
+    );
+    assert_eq!(
         recognize(
             "[INFO] [Server thread]: Saving chunks for level 'ServerLevel[world]'/minecraft:overworld"
         ),
@@ -169,6 +176,7 @@ fn player_controlled_text_is_not_an_event() {
         "[INFO] [Server thread]: * Notch left the game",
         "[INFO] [Server thread]:  joined the game",
         "[INFO] [Server thread]: <Notch> Saving chunks for level 'x'",
+        "[INFO] [Server thread]: <Notch> Steve lost connection: Timed out",
         "[WARN] [Server thread]: Notch joined the game",
         "[INFO] [Netty Server IO #1]: Notch joined the game",
         "[12:34:56] [Server thread/INFO]: Notch joined the game"
