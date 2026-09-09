@@ -55,6 +55,10 @@ use crate::utils::shell::Shell;
 /// our grace window runs before systemd SIGKILLs the unit.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(85);
 
+/// Disconnect reasons that mean the player or the server chose to end the
+/// session, as opposed to a connection problem, a kick, or a rule violation.
+const QUIET_DISCONNECT_REASONS: [&str; 2] = ["Disconnected", "Server closed"];
+
 /// server.properties keys whose values are sensitive.
 const SECRET_PROPERTY_KEYS: [&str; 3] = [
     "management-server-secret",
@@ -124,7 +128,7 @@ where
                     }
                 }
                 Some(ServerLogEvent::Disconnected { name, reason }) => {
-                    if reason != "Disconnected" {
+                    if !QUIET_DISCONNECT_REASONS.contains(&reason.as_str()) {
                         _ = shell.warn(format!("{} lost connection: {}", name, reason));
                         warned_disconnects.insert(name);
                     }

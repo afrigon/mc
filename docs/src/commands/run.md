@@ -24,8 +24,9 @@ the remote console (RCON) for live administration.
 mc reads the console output whether or not it is shown, and prints a status
 line for the events it recognizes: a player joining or leaving the instance,
 and a world save flushed to disk with the time it took. A player dropped for
-any reason other than quitting, such as a timeout or a kick, is reported as
-a warning with the reason in place of the leave line. With `--server-logs`, the
+any reason other than quitting or the instance stopping, such as a timeout
+or a kick, is reported as a warning with the reason in place of the leave
+line. With `--server-logs`, the
 console line that produced the event is shown as well, ahead of the status
 line.
 
