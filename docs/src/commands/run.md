@@ -21,10 +21,43 @@ is hidden unless `--server-logs` is passed; it is always written to
 `instance/logs/` by the server itself. The console is not interactive; use
 the remote console (RCON) for live administration.
 
+mc reads the console output whether or not it is shown, and prints a status
+line for the events it recognizes: a player joining or leaving the instance,
+and a world save flushed to disk with the time it took. These are shown
+with `--verbose`. A player dropped for any reason other than quitting or
+the instance stopping, such as a timeout or a kick, is reported as a warning
+with the reason in place of the leave line. A login turned away is reported
+as a warning naming the cause: the allow list, a ban, a full instance, or a
+taken name. Warnings are shown by default and hidden with `--quiet`.
+
+```text
+warning: connection refused for Notch, the user is not in the allow list
+``` With `--server-logs`, the
+console line that produced the event is shown as well, ahead of the status
+line.
+
+```text
+Minecraft ● Notch joined the game
+      Joined Notch
+Minecraft ● ThreadedAnvilChunkStorage: All dimensions are saved
+       Saved all dimensions flushed to disk in 1.2s
+```
+
+Shown console lines carry a `Minecraft` label, a dot colored by the line's
+log level, and the message. Warnings and errors the Java runtime prints
+outside the logger get their dot from the `WARNING:` or `ERROR:` prefix.
+Lines without a level, such as the continuation lines of a stack trace, keep
+the label and print as they are. Which levels are shown follows mc's own
+verbosity: warnings and errors by default, informational lines with
+`--verbose`, and finer levels with more `-v` flags. When the `jvm-arguments` in the manifest
+select a logging configuration file of their own, the console keeps that
+file's format and no events are recognized.
+
 With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and
-goes to `.tunnel/playitd.log` otherwise. The first start from a terminal prints a claim link to approve in a
+goes to `.tunnel/playitd.log` otherwise. When shown, every agent line is
+labeled with the provider's name, like the console lines. The first start from a terminal prints a claim link to approve in a
 browser and saves the resulting secret under `.tunnel/`. Without a terminal
 and without a secret, `mc run` fails with instructions rather than waiting —
 see [Tunnels](../guides/tunnel.md).
@@ -53,5 +86,7 @@ instance's exit code.
 
 - `--manifest-path <PATH>` — path to `mc.kdl`. Defaults to `./mc.kdl`.
 - `--lockfile-path <PATH>` — path to `mc.lock`. Defaults to `./mc.lock`.
-- `--server-logs` — show the instance's console output in the terminal.
-- `--tunnel-logs` — show the tunnel agent's output in the terminal.
+- `--server-logs` — show the instance's console output in the terminal,
+  labeled `Minecraft`. Recognized events are printed either way.
+- `--tunnel-logs` — show the tunnel agent's output in the terminal, labeled
+  with the provider's name.

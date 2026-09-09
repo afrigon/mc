@@ -1,22 +1,33 @@
+use std::collections::HashSet;
 use std::env;
 use std::io::ErrorKind;
 use std::io::IsTerminal;
 use std::process::ExitStatus;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::PoisonError;
 use std::time::Duration;
+use std::time::Instant;
 
+use anstyle::Style;
 use anyhow::Context;
+use tokio::io::AsyncRead;
 use tokio::io::AsyncWriteExt;
+use tokio::task::JoinHandle;
 use tokio_cron_scheduler::Job;
 use tokio_cron_scheduler::JobScheduler;
 use tokio_util::sync::CancellationToken;
 
+use crate::cli::styles;
 use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
 use crate::manifest::Manifest;
 use crate::manifest::ManifestPaths;
+use crate::minecraft::log::ServerLogEvent;
+use crate::minecraft::log::ServerLogLevel;
+use crate::minecraft::log::ServerLogLine;
 use crate::minecraft::log4j;
 use crate::minecraft::server_properties::ManagedServerProperties;
 use crate::minecraft::server_properties::PropertyEntries;
@@ -37,11 +48,16 @@ use crate::ops::tunnel::TunnelInstallOptions;
 use crate::services::playit_api::DASHBOARD_TUNNELS_URL;
 use crate::utils;
 use crate::utils::errors::McResult;
+use crate::utils::shell::Shell;
 
 /// How long to wait for the server to save and exit after asking it to stop
 /// before forcing it down. Kept under systemd's default 90s `TimeoutStopSec` so
 /// our grace window runs before systemd SIGKILLs the unit.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(85);
+
+/// Disconnect reasons that mean the player or the server chose to end the
+/// session, as opposed to a connection problem, a kick, or a rule violation.
+const QUIET_DISCONNECT_REASONS: [&str; 2] = ["Disconnected", "Server closed"];
 
 /// server.properties keys whose values are sensitive.
 const SECRET_PROPERTY_KEYS: [&str; 3] = [
@@ -64,12 +80,118 @@ pub struct RunOptions {
     pub tunnel_logs: bool
 }
 
-fn child_output(shown: bool) -> Stdio {
-    if shown {
-        Stdio::inherit()
-    } else {
-        Stdio::null()
+fn level_style(level: ServerLogLevel) -> &'static Style {
+    match level {
+        ServerLogLevel::Fatal | ServerLogLevel::Error => &styles::LOG_ERROR,
+        ServerLogLevel::Warn => &styles::LOG_WARN,
+        ServerLogLevel::Info => &styles::LOG_INFO,
+        ServerLogLevel::Debug => &styles::LOG_DEBUG,
+        ServerLogLevel::Trace => &styles::LOG_TRACE
     }
+}
+
+fn level_threshold(level: tracing::Level) -> ServerLogLevel {
+    match level {
+        tracing::Level::ERROR => ServerLogLevel::Error,
+        tracing::Level::WARN => ServerLogLevel::Warn,
+        tracing::Level::INFO => ServerLogLevel::Info,
+        tracing::Level::DEBUG => ServerLogLevel::Debug,
+        tracing::Level::TRACE => ServerLogLevel::Trace
+    }
+}
+
+/// Drains one of the server's output pipes, echoing the lines within
+/// `threshold` when `echo` is set and printing the events it recognizes
+/// either way. Events carry a level of their own that is held to the same
+/// threshold.
+fn forward_server_output<R>(
+    shell: Arc<Mutex<Shell>>,
+    output: R,
+    echo: bool,
+    threshold: ServerLogLevel
+) -> JoinHandle<()>
+where
+    R: AsyncRead + Unpin + Send + 'static
+{
+    tokio::spawn(async move {
+        let mut save_started: Option<Instant> = None;
+        let mut warned_disconnects: HashSet<String> = HashSet::new();
+        let show_info = ServerLogLevel::Info <= threshold;
+        let show_warn = ServerLogLevel::Warn <= threshold;
+
+        utils::process::for_each_line(output, |line| {
+            let parsed = ServerLogLine::parse(line);
+            let event = parsed.as_ref().and_then(ServerLogEvent::recognize);
+            let mut shell = shell.lock().unwrap_or_else(PoisonError::into_inner);
+
+            if echo {
+                match &parsed {
+                    Some(parsed) if parsed.level <= threshold => {
+                        let dot = level_style(parsed.level);
+
+                        _ = shell.echo(
+                            "Minecraft",
+                            format!("{dot}●{dot:#} {}", parsed.message),
+                            &styles::MINECRAFT
+                        );
+                    }
+                    Some(_) => {}
+                    None => _ = shell.echo("Minecraft", line, &styles::MINECRAFT)
+                }
+            }
+
+            match event {
+                Some(ServerLogEvent::Joined(name)) => {
+                    warned_disconnects.remove(&name);
+
+                    if show_info {
+                        _ = shell.status("Joined", name);
+                    }
+                }
+                Some(ServerLogEvent::Left(name)) => {
+                    if !warned_disconnects.remove(&name) && show_info {
+                        _ = shell.status("Left", name);
+                    }
+                }
+                Some(ServerLogEvent::Disconnected { name, reason }) => {
+                    if !QUIET_DISCONNECT_REASONS.contains(&reason.as_str()) {
+                        if show_warn {
+                            _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                        }
+
+                        warned_disconnects.insert(name);
+                    }
+                }
+                Some(ServerLogEvent::Refused { name, reason, .. }) => {
+                    let quiet = reason
+                        .raw()
+                        .is_some_and(|reason| QUIET_DISCONNECT_REASONS.contains(&reason));
+
+                    if !quiet && show_warn {
+                        _ = shell.warn(format!("connection refused for {}, {}", name, reason));
+                    }
+                }
+                Some(ServerLogEvent::SaveStarted) => {
+                    save_started.get_or_insert_with(Instant::now);
+                }
+                Some(ServerLogEvent::SaveCompleted) => {
+                    let message = match save_started.take() {
+                        Some(started) => format!(
+                            "all dimensions flushed to disk in {:.1?}",
+                            started.elapsed()
+                        ),
+                        None => String::from("all dimensions flushed to disk")
+                    };
+
+                    if show_info {
+                        _ = shell.status("Saved", message);
+                    }
+                }
+                None => {}
+            }
+        })
+        .await
+    })
 }
 
 fn has_jvm_property(arguments: &[String], property: &str) -> bool {
@@ -290,6 +412,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
 
     if let Some(ref tunnel) = manifest.tunnel {
         let tunnel_descriptor = tunnel.provider_descriptor(context).await?;
+        let tunnel_provider = tunnel_descriptor.product;
         let agent_path =
             ops::tunnel::agent_path(&tunnel_directory, &tunnel_descriptor, current_platform);
 
@@ -351,6 +474,7 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             socket_path: ops::tunnel::socket_path(&manifest.name),
             log_level: server_log_level,
             logs: options.tunnel_logs,
+            provider: tunnel_provider,
             address: tunnel_address.clone()
         });
     }
@@ -385,8 +509,8 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .arg("--nogui")
         .current_dir(&instance_path)
         .stdin(Stdio::piped())
-        .stdout(child_output(options.server_logs))
-        .stderr(child_output(options.server_logs))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .kill_on_drop(true);
 
     utils::process::detach_from_terminal_signals(&mut command);
@@ -410,6 +534,30 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
     });
 
     let mut child = command.spawn()?;
+
+    let server_stdout = child
+        .stdout
+        .take()
+        .context("could not attach to the minecraft server output")?;
+    let server_stderr = child
+        .stderr
+        .take()
+        .context("could not attach to the minecraft server output")?;
+    let threshold = level_threshold(context.log_level);
+    let output_readers = [
+        forward_server_output(
+            context.shell_handle(),
+            server_stdout,
+            options.server_logs,
+            threshold
+        ),
+        forward_server_output(
+            context.shell_handle(),
+            server_stderr,
+            options.server_logs,
+            threshold
+        )
+    ];
 
     if let Some(ref notifier) = notifier {
         notifier
@@ -571,6 +719,10 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
             }
         }
     };
+
+    for reader in output_readers {
+        let _ = reader.await;
+    }
 
     tunnel_cancel.cancel();
 

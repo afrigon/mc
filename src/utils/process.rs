@@ -1,6 +1,9 @@
 use std::future::pending;
 
 use anyhow::Context;
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncRead;
+use tokio::io::BufReader;
 use tokio::process::Command;
 #[cfg(unix)]
 use tokio::signal::unix::Signal;
@@ -34,6 +37,30 @@ pub fn render_command(command: &Command) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Calls `handle` with every line `output` yields until it closes or fails.
+/// Invalid UTF-8 is replaced rather than dropping the line.
+pub async fn for_each_line<R, F>(output: R, mut handle: F)
+where
+    R: AsyncRead + Unpin,
+    F: FnMut(&str)
+{
+    let mut reader = BufReader::new(output);
+    let mut buffer = Vec::new();
+
+    loop {
+        buffer.clear();
+
+        match reader.read_until(b'\n', &mut buffer).await {
+            Ok(0) | Err(_) => return,
+            Ok(_) => {}
+        }
+
+        let line = String::from_utf8_lossy(&buffer);
+
+        handle(line.trim_end_matches(['\n', '\r']));
+    }
 }
 
 pub fn detach_from_terminal_signals(command: &mut Command) {

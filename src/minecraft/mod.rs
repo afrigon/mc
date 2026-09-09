@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde::Serializer;
 
 pub mod eula;
+pub mod log;
 pub mod log4j;
 pub mod players;
 pub mod seed;

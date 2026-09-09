@@ -9,6 +9,14 @@ pub enum TunnelProviderKind {
     Playit
 }
 
+impl TunnelProviderKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            TunnelProviderKind::Playit => "Playit"
+        }
+    }
+}
+
 impl fmt::Display for TunnelProviderKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let provider = match self {
