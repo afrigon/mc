@@ -146,7 +146,18 @@ fn join_leave_and_save_events_are_recognized() {
         recognize("[INFO] [Server thread]: Notch lost connection: Timed out"),
         Some(ServerLogEvent::Disconnected {
             name: String::from("Notch"),
+            address: None,
             reason: String::from("Timed out")
+        })
+    );
+    assert_eq!(
+        recognize(
+            "[INFO] [Server thread]: Notch (/[0:0:0:0:0:0:0:1]:49242) lost connection: You are not white-listed on this server!"
+        ),
+        Some(ServerLogEvent::Disconnected {
+            name: String::from("Notch"),
+            address: Some(String::from("[0:0:0:0:0:0:0:1]:49242")),
+            reason: String::from("You are not white-listed on this server!")
         })
     );
     assert_eq!(
@@ -177,6 +188,8 @@ fn player_controlled_text_is_not_an_event() {
         "[INFO] [Server thread]:  joined the game",
         "[INFO] [Server thread]: <Notch> Saving chunks for level 'x'",
         "[INFO] [Server thread]: <Notch> Steve lost connection: Timed out",
+        "[INFO] [Server thread]: <Notch> Steve (/203.0.113.7:51234) lost connection: Timed out",
+        "[INFO] [Server thread]: Disconnecting Notch (/203.0.113.7:51234): You are banned from this server.",
         "[WARN] [Server thread]: Notch joined the game",
         "[INFO] [Netty Server IO #1]: Notch joined the game",
         "[12:34:56] [Server thread/INFO]: Notch joined the game"

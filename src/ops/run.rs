@@ -121,16 +121,33 @@ where
             }
 
             match event {
-                Some(ServerLogEvent::Joined(name)) => _ = shell.status("Joined", name),
+                Some(ServerLogEvent::Joined(name)) => {
+                    warned_disconnects.remove(&name);
+                    _ = shell.status("Joined", name);
+                }
                 Some(ServerLogEvent::Left(name)) => {
                     if !warned_disconnects.remove(&name) {
                         _ = shell.status("Left", name);
                     }
                 }
-                Some(ServerLogEvent::Disconnected { name, reason }) => {
+                Some(ServerLogEvent::Disconnected {
+                    name,
+                    address,
+                    reason
+                }) => {
                     if !QUIET_DISCONNECT_REASONS.contains(&reason.as_str()) {
-                        _ = shell.warn(format!("{} lost connection: {}", name, reason));
-                        warned_disconnects.insert(name);
+                        match address {
+                            Some(address) => {
+                                _ = shell.warn(format!(
+                                    "{} ({}) lost connection: {}",
+                                    name, address, reason
+                                ));
+                            }
+                            None => {
+                                _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                                warned_disconnects.insert(name);
+                            }
+                        }
                     }
                 }
                 Some(ServerLogEvent::SaveStarted) => {

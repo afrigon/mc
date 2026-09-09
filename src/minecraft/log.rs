@@ -69,7 +69,13 @@ impl<'a> ServerLogLine<'a> {
 pub enum ServerLogEvent {
     Joined(String),
     Left(String),
-    Disconnected { name: String, reason: String },
+    /// The address is present while the player is still logging in, which
+    /// is how refused logins are reported.
+    Disconnected {
+        name: String,
+        address: Option<String>,
+        reason: String
+    },
     SaveStarted,
     SaveCompleted
 }
@@ -88,9 +94,18 @@ impl ServerLogEvent {
             return player_name(name).map(ServerLogEvent::Left);
         }
 
-        if let Some((name, reason)) = line.message.split_once(" lost connection: ") {
+        if let Some((subject, reason)) = line.message.split_once(" lost connection: ") {
+            let (name, address) = match subject
+                .strip_suffix(')')
+                .and_then(|subject| subject.split_once(" (/"))
+            {
+                Some((name, address)) => (name, Some(address.to_string())),
+                None => (subject, None)
+            };
+
             return player_name(name).map(|name| ServerLogEvent::Disconnected {
                 name,
+                address,
                 reason: reason.to_string()
             });
         }
