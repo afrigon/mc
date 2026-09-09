@@ -81,4 +81,4 @@ Playit 2026-09-09T12:34:56.123456Z  INFO playit_agent_core::tunnel: connected
 ```
 
 mc's own log verbosity is controlled by the global `--verbose` flag; the
-instance's console log level follows it.
+instance's console lines shown in the journal follow it.

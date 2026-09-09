@@ -90,15 +90,34 @@ fn level_style(level: ServerLogLevel) -> &'static Style {
     }
 }
 
-/// Drains one of the server's output pipes, echoing every line when
-/// `echo` is set and printing the events it recognizes either way.
-fn forward_server_output<R>(shell: Arc<Mutex<Shell>>, output: R, echo: bool) -> JoinHandle<()>
+fn level_threshold(level: tracing::Level) -> ServerLogLevel {
+    match level {
+        tracing::Level::ERROR => ServerLogLevel::Error,
+        tracing::Level::WARN => ServerLogLevel::Warn,
+        tracing::Level::INFO => ServerLogLevel::Info,
+        tracing::Level::DEBUG => ServerLogLevel::Debug,
+        tracing::Level::TRACE => ServerLogLevel::Trace
+    }
+}
+
+/// Drains one of the server's output pipes, echoing the lines within
+/// `threshold` when `echo` is set and printing the events it recognizes
+/// either way. Events carry a level of their own that is held to the same
+/// threshold.
+fn forward_server_output<R>(
+    shell: Arc<Mutex<Shell>>,
+    output: R,
+    echo: bool,
+    threshold: ServerLogLevel
+) -> JoinHandle<()>
 where
     R: AsyncRead + Unpin + Send + 'static
 {
     tokio::spawn(async move {
         let mut save_started: Option<Instant> = None;
         let mut warned_disconnects: HashSet<String> = HashSet::new();
+        let show_info = ServerLogLevel::Info <= threshold;
+        let show_warn = ServerLogLevel::Warn <= threshold;
 
         utils::process::for_each_line(output, |line| {
             let parsed = ServerLogLine::parse(line);
@@ -107,7 +126,7 @@ where
 
             if echo {
                 match &parsed {
-                    Some(parsed) => {
+                    Some(parsed) if parsed.level <= threshold => {
                         let dot = level_style(parsed.level);
 
                         _ = shell.echo(
@@ -116,6 +135,7 @@ where
                             &styles::MINECRAFT
                         );
                     }
+                    Some(_) => {}
                     None => _ = shell.echo("Minecraft", line, &styles::MINECRAFT)
                 }
             }
@@ -123,16 +143,22 @@ where
             match event {
                 Some(ServerLogEvent::Joined(name)) => {
                     warned_disconnects.remove(&name);
-                    _ = shell.status("Joined", name);
+
+                    if show_info {
+                        _ = shell.status("Joined", name);
+                    }
                 }
                 Some(ServerLogEvent::Left(name)) => {
-                    if !warned_disconnects.remove(&name) {
+                    if !warned_disconnects.remove(&name) && show_info {
                         _ = shell.status("Left", name);
                     }
                 }
                 Some(ServerLogEvent::Disconnected { name, reason }) => {
                     if !QUIET_DISCONNECT_REASONS.contains(&reason.as_str()) {
-                        _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                        if show_warn {
+                            _ = shell.warn(format!("{} lost connection: {}", name, reason));
+                        }
+
                         warned_disconnects.insert(name);
                     }
                 }
@@ -141,7 +167,7 @@ where
                         .raw()
                         .is_some_and(|reason| QUIET_DISCONNECT_REASONS.contains(&reason));
 
-                    if !quiet {
+                    if !quiet && show_warn {
                         _ = shell.warn(format!("connection refused for {}, {}", name, reason));
                     }
                 }
@@ -157,7 +183,9 @@ where
                         None => String::from("all dimensions flushed to disk")
                     };
 
-                    _ = shell.status("Saved", message);
+                    if show_info {
+                        _ = shell.status("Saved", message);
+                    }
                 }
                 None => {}
             }
@@ -515,9 +543,20 @@ pub async fn run(context: &mut McContext, options: &RunOptions) -> McResult<Opti
         .stderr
         .take()
         .context("could not attach to the minecraft server output")?;
+    let threshold = level_threshold(context.log_level);
     let output_readers = [
-        forward_server_output(context.shell_handle(), server_stdout, options.server_logs),
-        forward_server_output(context.shell_handle(), server_stderr, options.server_logs)
+        forward_server_output(
+            context.shell_handle(),
+            server_stdout,
+            options.server_logs,
+            threshold
+        ),
+        forward_server_output(
+            context.shell_handle(),
+            server_stderr,
+            options.server_logs,
+            threshold
+        )
     ];
 
     if let Some(ref notifier) = notifier {

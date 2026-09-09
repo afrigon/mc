@@ -23,11 +23,12 @@ the remote console (RCON) for live administration.
 
 mc reads the console output whether or not it is shown, and prints a status
 line for the events it recognizes: a player joining or leaving the instance,
-and a world save flushed to disk with the time it took. A player dropped for
-any reason other than quitting or the instance stopping, such as a timeout
-or a kick, is reported as a warning with the reason in place of the leave
-line. A login turned away is reported as a warning naming the cause: the
-allow list, a ban, a full instance, or a taken name.
+and a world save flushed to disk with the time it took. These are shown
+with `--verbose`. A player dropped for any reason other than quitting or
+the instance stopping, such as a timeout or a kick, is reported as a warning
+with the reason in place of the leave line. A login turned away is reported
+as a warning naming the cause: the allow list, a ban, a full instance, or a
+taken name. Warnings are shown by default and hidden with `--quiet`.
 
 ```text
 warning: connection refused for Notch, the user is not in the allow list
@@ -46,7 +47,9 @@ Shown console lines carry a `Minecraft` label, a dot colored by the line's
 log level, and the message. Warnings and errors the Java runtime prints
 outside the logger get their dot from the `WARNING:` or `ERROR:` prefix.
 Lines without a level, such as the continuation lines of a stack trace, keep
-the label and print as they are. When the `jvm-arguments` in the manifest
+the label and print as they are. Which levels are shown follows mc's own
+verbosity: warnings and errors by default, informational lines with
+`--verbose`, and finer levels with more `-v` flags. When the `jvm-arguments` in the manifest
 select a logging configuration file of their own, the console keeps that
 file's format and no events are recognized.
 

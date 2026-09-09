@@ -1,6 +1,8 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Ordered from most to least severe, so `level <= threshold` means the
+/// line is at least as important as the threshold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ServerLogLevel {
     Fatal,
     Error,
