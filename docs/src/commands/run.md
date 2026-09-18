@@ -21,6 +21,26 @@ is hidden unless `--server-logs` is passed; it is always written to
 `instance/logs/` by the server itself. The console is not interactive; use
 the remote console (RCON) for live administration.
 
+mc reads the console output whether or not it is shown, and prints a status
+line for the events it recognizes: a player joining or leaving the instance,
+and a world save flushed to disk with the time it took. These are shown
+with `--verbose`. A player dropped for any reason other than quitting or
+the instance stopping, such as a timeout or a kick, is reported as a warning
+with the reason in place of the leave line. A login turned away is reported
+as a warning naming the cause: the allow list, a ban, a full instance, or a
+taken name. Warnings are shown by default and hidden with `--quiet`.
+
+```text
+      Joined Notch
+       Saved all dimensions flushed to disk in 1.2s
+warning: connection refused for Notch, the user is not in the allow list
+```
+
+With `--server-logs`, the console lines shown follow mc's verbosity:
+warnings and errors by default, more with `--verbose`. When the
+`jvm-arguments` in the manifest select a logging configuration file of their
+own, no events are recognized.
+
 With a `tunnel` section, the tunnel agent starts beside the instance and
 is restarted if it stops on its own; the public address is printed at
 startup. The agent's output is hidden unless `--tunnel-logs` is passed, and

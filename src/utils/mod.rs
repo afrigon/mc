@@ -14,3 +14,6 @@ pub mod shell;
 pub mod verbosity;
 
 pub use case_iterable::CaseIterable;
+
+#[cfg(test)]
+mod tests;

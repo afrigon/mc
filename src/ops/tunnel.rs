@@ -7,14 +7,17 @@ use std::sync::PoisonError;
 use std::time::Duration;
 use std::time::Instant;
 
+use anstream::adapter::strip_str;
 use anyhow::Context;
 use serde::Deserialize;
 use serde::Serialize;
+use tokio::io::AsyncRead;
 use tokio::process::Child;
 use tokio::process::Command;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+use crate::cli::styles;
 use crate::context::McContext;
 use crate::env::Architecture;
 use crate::env::Platform;
@@ -311,6 +314,7 @@ pub struct TunnelAgentOptions {
     pub socket_path: String,
     pub log_level: &'static str,
     pub logs: bool,
+    pub provider: TunnelProviderKind,
     pub address: Option<String>
 }
 
@@ -325,14 +329,18 @@ fn agent_command(options: &TunnelAgentOptions) -> Command {
         .env("PLAYIT_LOG", options.log_level)
         .current_dir(&options.work_directory)
         .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
         .kill_on_drop(true);
 
     // The agent logs to stderr unless given a log file, so hidden output is
     // kept on disk rather than dropped.
-    if !options.logs {
-        command.arg("--log-path").arg(LOG_FILE_NAME);
+    if options.logs {
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    } else {
+        command
+            .arg("--log-path")
+            .arg(LOG_FILE_NAME)
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
     }
 
     utils::process::detach_from_terminal_signals(&mut command);
@@ -376,6 +384,24 @@ async fn stop_agent(child: &mut Child) {
     let _ = child.kill().await;
 }
 
+// The agent colors its own output; stripping it keeps the line in mc's
+// style rather than a mix of both.
+fn forward_agent_output<R>(shell: Arc<Mutex<Shell>>, label: &'static str, output: R)
+where
+    R: AsyncRead + Unpin + Send + 'static
+{
+    tokio::spawn(async move {
+        utils::process::for_each_line(output, |line| {
+            _ = shell.lock().unwrap_or_else(PoisonError::into_inner).echo(
+                label,
+                strip_str(line),
+                &styles::TUNNEL
+            );
+        })
+        .await
+    });
+}
+
 fn warn(shell: &Arc<Mutex<Shell>>, message: String) {
     _ = shell
         .lock()
@@ -411,6 +437,14 @@ pub fn supervise(
                     return;
                 }
             };
+
+            if let Some(stdout) = child.stdout.take() {
+                forward_agent_output(shell.clone(), options.provider.label(), stdout);
+            }
+
+            if let Some(stderr) = child.stderr.take() {
+                forward_agent_output(shell.clone(), options.provider.label(), stderr);
+            }
 
             if let Some(address) = options.address.as_ref().filter(|_| !announced) {
                 announced = true;

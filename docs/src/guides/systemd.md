@@ -72,4 +72,4 @@ journalctl -u myserver -f
 ```
 
 mc's own log verbosity is controlled by the global `--verbose` flag; the
-instance's console log level follows it.
+instance's console lines shown in the journal follow it.
