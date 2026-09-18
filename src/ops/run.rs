@@ -82,8 +82,8 @@ pub struct RunOptions {
 
 fn level_style(level: ServerLogLevel) -> &'static Style {
     match level {
-        ServerLogLevel::Fatal | ServerLogLevel::Error => &styles::LOG_ERROR,
-        ServerLogLevel::Warn => &styles::LOG_WARN,
+        ServerLogLevel::Fatal | ServerLogLevel::Error => &styles::ERROR,
+        ServerLogLevel::Warn => &styles::WARN,
         ServerLogLevel::Info => &styles::LOG_INFO,
         ServerLogLevel::Debug => &styles::LOG_DEBUG,
         ServerLogLevel::Trace => &styles::LOG_TRACE
